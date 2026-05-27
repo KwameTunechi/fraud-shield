@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 export default function BiometricScreen({ onAuthSuccess }) {
   const [status, setStatus] = useState('idle'); // idle | scanning | success | failed | unavailable
   const [hasBiometric, setHasBiometric] = useState(false);
+  const [confirmSkip, setConfirmSkip] = useState(false);
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -52,14 +53,7 @@ export default function BiometricScreen({ onAuthSuccess }) {
   }
 
   function handleSkip() {
-    Alert.alert(
-      'Skip Biometric?',
-      'Biometric authentication adds an extra layer of security. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Skip', style: 'destructive', onPress: onAuthSuccess },
-      ]
-    );
+    setConfirmSkip(true);
   }
 
   const icons = { idle: '👆', scanning: '🔍', success: '✅', failed: '❌', unavailable: '⚠️' };
@@ -101,9 +95,23 @@ export default function BiometricScreen({ onAuthSuccess }) {
           )}
 
           {status !== 'success' && status !== 'unavailable' && (
-            <TouchableOpacity onPress={handleSkip}>
-              <Text style={styles.skip}>Skip for now</Text>
-            </TouchableOpacity>
+            confirmSkip ? (
+              <View style={styles.skipConfirm}>
+                <Text style={styles.skipConfirmText}>Skip biometric security?</Text>
+                <View style={styles.skipConfirmRow}>
+                  <TouchableOpacity onPress={() => setConfirmSkip(false)} style={styles.skipCancelBtn}>
+                    <Text style={styles.skipCancelText}>Go back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={onAuthSuccess} style={styles.skipConfirmBtn}>
+                    <Text style={styles.skipConfirmBtnText}>Yes, skip</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={handleSkip}>
+                <Text style={styles.skip}>Skip for now</Text>
+              </TouchableOpacity>
+            )
           )}
         </View>
 
@@ -144,6 +152,13 @@ const styles = StyleSheet.create({
   btnGrad: { paddingVertical: 15, alignItems: 'center' },
   btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   skip: { color: '#94a3b8', fontSize: 13, fontWeight: '500' },
+  skipConfirm: { alignItems: 'center', gap: 10, paddingVertical: 4 },
+  skipConfirmText: { fontSize: 13, color: '#64748b', fontWeight: '600', textAlign: 'center' },
+  skipConfirmRow: { flexDirection: 'row', gap: 10 },
+  skipCancelBtn: { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+  skipCancelText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
+  skipConfirmBtn: { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 10, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
+  skipConfirmBtnText: { fontSize: 13, color: '#dc2626', fontWeight: '600' },
   layers: { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   layersTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
   layerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
