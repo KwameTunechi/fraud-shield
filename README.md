@@ -202,3 +202,19 @@ npm run build
 ## Research Context
 
 This platform was developed as part of an academic research project at the **University of Ghana** investigating how composite security layers (AI anomaly detection + blockchain immutability + MFA friction) reduce fraud rates in the Ghanaian mobile money sector compared to single-layer defences. The mobile simulation app is used to demonstrate attack scenarios and corresponding system responses in user studies.
+
+---
+
+## Team
+
+| Name | Role | GitHub |
+|---|---|---|
+| Evans Adusu | Project Lead / Web & Mobile | [@KwameTunechi](https://github.com/KwameTunechi) |
+
+> **Sprint 0 task for every team member:** fork this repo, create a branch `docs/yourname-add-to-team`, add your row to this table, open a pull request, and ask a teammate to review it. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching strategy, PR etiquette, and commit conventions used by this team.
