@@ -8,6 +8,8 @@ import {
   issueRefreshToken, revokeRefreshToken, findSessionByRefresh,
 } from '../services/auth/tokens.js';
 import { generateMfaSecret, verifyMfaCode } from '../services/auth/mfa.js';
+import { generateAndSendOtp, verifyOtp } from '../services/auth/otp.js';
+import { hashPin } from '../services/auth/pin.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { authenticate } from '../middleware/authenticate.js';
 
@@ -188,6 +190,112 @@ router.get('/me', authenticate, async (req, res) => {
   );
   if (!meRows[0]) return res.status(404).json({ error: 'Account not found' });
   res.json(meRows[0]);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CUSTOMER AUTH  (phone number + SMS OTP + PIN)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const ghanaPhone = z.string().regex(/^\+233\d{9}$/, 'Phone must be +233 followed by 9 digits');
+
+const requestOtpSchema  = z.object({ phone: ghanaPhone });
+const verifyOtpSchema   = z.object({
+  phone:    ghanaPhone,
+  code:     z.string().length(6).regex(/^\d{6}$/, 'Code must be 6 digits'),
+  pin:      z.string().regex(/^\d{4}$/).optional(),
+  fullName: z.string().min(2).max(100).optional(),
+});
+
+// 3 OTP requests per phone per 10 minutes — prevents SMS bill abuse
+const requestOtpLimiter = rateLimit({
+  keyPrefix: 'customer_otp',
+  max:       3,
+  windowSec: 10 * 60,
+  getKey:    (req) => (req.body?.phone || '').trim(),
+});
+
+// ─── POST /api/auth/customer/request-otp ────────────────────────────────────
+
+router.post('/customer/request-otp', requestOtpLimiter, async (req, res) => {
+  const parsed = requestOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Phone must be in +233XXXXXXXXX format' });
+  }
+  await generateAndSendOtp(parsed.data.phone, 'signin');
+  // Always return the same response whether the phone is registered or not
+  res.json({ status: 'ok', message: 'OTP sent' });
+});
+
+// ─── POST /api/auth/customer/verify-otp ─────────────────────────────────────
+
+router.post('/customer/verify-otp', async (req, res) => {
+  const parsed = verifyOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+  }
+  const { phone, code, pin, fullName } = parsed.data;
+
+  const ok = await verifyOtp(phone, 'signin', code);
+  if (!ok) return res.status(401).json({ error: 'Invalid or expired OTP' });
+
+  // Find or create the user
+  const { rows: existing } = await pool.query(
+    'SELECT * FROM users WHERE phone_number = $1', [phone]
+  );
+  let user = existing[0];
+
+  if (user) {
+    // Returning customer
+    if (!user.pin_hash && !pin) {
+      return res.status(400).json({ error: 'PIN required to complete account setup' });
+    }
+    if (!user.pin_hash && pin) {
+      const pinHash = await hashPin(pin);
+      const { rows: updated } = await pool.query(
+        'UPDATE users SET pin_hash = $1 WHERE id = $2 RETURNING *',
+        [pinHash, user.id]
+      );
+      user = updated[0];
+    }
+  } else {
+    // New customer — PIN and full name required on first signup
+    if (!pin || !fullName) {
+      return res.status(400).json({ error: 'PIN and full name required for new signup' });
+    }
+    const pinHash = await hashPin(pin);
+    const { rows: inserted } = await pool.query(
+      `INSERT INTO users (phone_number, pin_hash, full_name) VALUES ($1, $2, $3) RETURNING *`,
+      [phone, pinHash, fullName]
+    );
+    user = inserted[0];
+  }
+
+  const accessToken = signAccessToken({
+    sub:   user.id,
+    type:  'user',
+    phone: user.phone_number,
+  });
+
+  // Mobile apps can't use httpOnly cookies — send the refresh token in the body.
+  // The mobile app stores it in expo-secure-store (iOS Keychain / Android Keystore).
+  const refreshToken = await issueRefreshToken({
+    userId:      user.id,
+    ip:          req.ip,
+    fingerprint: req.headers['user-agent'] || null,
+  });
+
+  res.json({
+    status: 'ok',
+    accessToken,
+    refreshToken,
+    user: {
+      id:         user.id,
+      phone:      user.phone_number,
+      fullName:   user.full_name,
+      balance:    user.balance,
+      trustScore: user.trust_score,
+    },
+  });
 });
 
 export default router;
