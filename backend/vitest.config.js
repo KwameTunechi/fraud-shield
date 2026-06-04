@@ -4,7 +4,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    testTimeout: 15000,   // DB + Redis calls can be slow
+    testTimeout: 15000,
     hookTimeout: 15000,
+    pool: 'forks',
+    poolOptions: { forks: { singleFork: true } }, // sequential — prevents blockchain chain race conditions
+    globalSetup:    './tests/setup.js',             // flush Redis + blockchain before any file
+    globalTeardown: './tests/teardown.js',         // close pool + redis once after all files
   },
 });

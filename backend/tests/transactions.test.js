@@ -53,11 +53,14 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool.query('DELETE FROM alerts WHERE user_id = $1', [senderId]);
   await pool.query('DELETE FROM sessions WHERE user_id = $1', [senderId]);
+  // blockchain_entries references transactions — delete chain entries first
+  await pool.query(
+    'DELETE FROM blockchain_entries WHERE transaction_id IN (SELECT id FROM transactions WHERE sender_id = $1)',
+    [senderId]
+  );
   await pool.query('DELETE FROM transactions WHERE sender_id = $1', [senderId]);
   await pool.query('DELETE FROM users WHERE phone_number IN ($1,$2)', [SENDER_PHONE, RECIPIENT_PHONE]);
   await pool.query('DELETE FROM admins WHERE email = $1', ['test-admin-txn@fraudshield.test']);
-  await pool.end();
-  await redis.quit();
 });
 
 // ─── POST /api/transactions ───────────────────────────────────────────────────
@@ -134,7 +137,12 @@ describe('POST /api/transactions', () => {
     expect(res.status).toBe(201);
     expect(res.body.reasons).toContain('new_recipient');
 
-    // Delete the transaction to freshPhone before deleting the user (FK)
+    // Delete chain entries → alerts → transactions → user (FK order)
+    await pool.query(
+      'DELETE FROM blockchain_entries WHERE transaction_id IN (SELECT id FROM transactions WHERE recipient_phone = $1)',
+      [freshPhone]
+    );
+    await pool.query('DELETE FROM alerts WHERE transaction_id IN (SELECT id FROM transactions WHERE recipient_phone = $1)', [freshPhone]);
     await pool.query('DELETE FROM transactions WHERE recipient_phone = $1', [freshPhone]);
     await pool.query('DELETE FROM users WHERE phone_number = $1', [freshPhone]);
   });

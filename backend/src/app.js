@@ -11,6 +11,11 @@ import authRouter         from './routes/auth.js';
 import transactionsRouter from './routes/transactions.js';
 import alertsRouter       from './routes/alerts.js';
 import riskRouter         from './routes/risk.js';
+import eventsRouter       from './routes/events.js';
+import blockchainRouter   from './routes/blockchain.js';
+import customersRouter    from './routes/customers.js';
+import adminsRouter       from './routes/admins.js';
+import settingsRouter     from './routes/settings.js';
 
 const app = express();
 
@@ -43,6 +48,11 @@ app.use('/api/auth',         authRouter);
 app.use('/api/transactions', transactionsRouter);
 app.use('/api/alerts',       alertsRouter);
 app.use('/api/risk',         riskRouter);
+app.use('/api/events',       eventsRouter);
+app.use('/api/blockchain',   blockchainRouter);
+app.use('/api/customers',   customersRouter);
+app.use('/api/admins',      adminsRouter);
+app.use('/api',             settingsRouter);  // mounts /api/ai-config and /api/settings
 
 // 404 handler
 app.use((req, res) => {

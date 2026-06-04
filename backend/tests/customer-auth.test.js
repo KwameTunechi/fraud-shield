@@ -33,8 +33,6 @@ afterAll(async () => {
   await pool.query('DELETE FROM users WHERE phone_number IN ($1, $2)', [TEST_PHONE, TEST_PHONE_2]);
   await redis.del(OTP_REDIS_KEY);
   await redis.del(`rl:customer_otp:${TEST_PHONE}`);
-  await pool.end();
-  await redis.quit();
 });
 
 // ─── POST /api/auth/customer/request-otp ────────────────────────────────────

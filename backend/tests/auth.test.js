@@ -24,10 +24,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await pool.query('DELETE FROM admins WHERE email = $1', [TEST_EMAIL]);
-  // Clear any rate-limit keys set during tests
   await redis.del(`rl:admin_signin:${TEST_EMAIL}`);
-  await pool.end();
-  await redis.quit();
 });
 
 // ─── POST /api/auth/admin/signin ─────────────────────────────────────────────

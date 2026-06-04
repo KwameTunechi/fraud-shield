@@ -1,0 +1,3500 @@
+
+FraudShield
+From Prototype to Production
+A Beginner-Friendly Sprint Guide for the FraudShield Team
+AI Security Platform for Ghana Mobile Money
+What this document is
+A complete, step by step roadmap that takes your FraudShield project from a beautiful prototype with hardcoded data to a real, working, deployed system that you can defend as a research artifact.
+
+It is written for people who have never built a backend, never deployed an app, and have only done a little coding. Every step explains what you are doing AND why you are doing it. Every sprint ends with something you can show off.
+
+Use it as a workbook. Tick off boxes. Take turns. Help each other.
+Contents
+
+How to Use This Guide
+This is a long document because building real software has a lot of small steps. Do not try to read it all at once. Treat it like a recipe book: open it at the sprint you are on, follow the steps, and move on.
+The shape of the guide
+The guide is split into five parts, which match how the work actually flows:
+Part 1: Before You Write Any Code. Setting up GitHub, your local machines, and how the group works together. One sprint.
+Part 2: Build the Backend. The server, the database, login, transactions, the AI risk engine, the audit trail. Five sprints.
+Part 3: Connect the Web Dashboard. Replace fake data in the admin app with real data from your backend. Three sprints.
+Part 4: Connect the Mobile App. Same idea, but for the customer app. Two sprints.
+Part 5: Go Live. Put everything on the internet, add monitoring, and run a security check. Two sprints.
+How a sprint is structured
+Each sprint has the same sections, so you always know what to look for:
+Sprint goal: the single thing you should be able to demo at the end.
+Why this sprint matters: the reasoning, so you understand the choices.
+Who does what: a suggestion for how to split the work across the group.
+The work: numbered tasks with commands, code, and explanations.
+Definition of Done: a checklist. If every box is ticked, the sprint is finished.
+Demo script: what to show to celebrate progress and get feedback.
+Conventions used in the guide
+Code that looks like this is something you type into the terminal or paste into a file.
+Blue boxes are information. Yellow boxes are warnings. Red boxes are critical: read carefully. Green boxes are milestones.
+A note on pace
+The sprints are sized for one to two weeks of part time work each. Some will take longer, some shorter. Do not panic if you are slower than the suggested time. Slow and correct beats fast and broken, especially when you are learning.
+Tip
+When something does not work and you are stuck for more than 30 minutes, post the error message in the group chat. Do not suffer in silence. Programming is a team sport and getting unstuck is faster with a second pair of eyes.
+Where You Are Now
+Before we plan the road, let us look at the map honestly. Here is what your team has already built, and what is missing.
+What is already working
+On the web admin dashboard (the React app at the root of the repository):
+Eleven complete pages: landing page, sign in, two factor verification, dashboard, live transactions, risk analytics, alerts and incidents, customer directory, blockchain ledger, AI configuration, system settings, and administrators.
+A solid utility layer (formatters, CSV export, retry and circuit breaker helpers, a structured logger, risk scoring helpers) with 96 percent test coverage.
+A typed error class hierarchy in src/errors so that errors can be caught and handled meaningfully.
+Zod validation schemas in src/schemas for every form.
+A GitHub Actions pipeline that runs lint, then tests, then builds on every push.
+Tailwind CSS 4 and Recharts already configured.
+On the mobile customer app (the Expo project in the mobile folder):
+A full authentication flow: splash, phone and PIN sign in, OTP, biometric.
+Main screens: home wallet, a five step send money flow with AI risk preview, transactions list, transaction detail with a blockchain hash, fraud scenario simulator, profile, security.
+Navigation guards and data models already laid out.
+What is missing
+Both apps have one thing in common: every single piece of data on every screen is hardcoded. There is no backend, no database, no real authentication, and no shared state between the web app and the mobile app. When you log in, nothing checks anything. When you send money, nothing actually moves.
+To turn this into a real research artifact, three things need to exist:
+A backend API. A server, written in Node.js, that handles login, stores transactions, runs the risk engine, and writes to the audit trail.
+A database. PostgreSQL, where all the real data lives.
+A connection layer. Code in both apps that talks to the backend over the network, replacing the fake data.
+That is the work. Everything in this guide is in service of those three things.
+Key insight
+Your prototype is much further along than most. The UI, the validation schemas, the utility helpers, the CI pipeline, the test setup, all the design work, all the architecture decisions: these are done. What is left is to build the engine that powers them. That is real and substantial work, but it is well scoped.
+Part 1: Before You Write Any Code
+Software is built by teams. Teams need rules, or they fall over. This part is about setting those rules, getting everyone's machine ready, and learning the workflow you will use for the rest of the project.
+Resist the urge to skip this. Most projects that fail do so because of how the team works, not because of the code. One sprint of preparation will save you ten sprints of confusion.
+Sprint 0: Team, GitHub, and Local Setup
+Sprint goal
+Every person on the team can pull the FraudShield repository to their own laptop, install dependencies, run the web app and the mobile app locally, and push a small change through a pull request that gets reviewed and merged by another teammate.
+Why this sprint matters
+You are a group, and you said you take turns pushing code. That means you need one shared source of truth (GitHub), one way of making changes (branches and pull requests), and one way of reviewing those changes (code review). Without these, two people will overwrite each other's work and you will spend more time fixing merge conflicts than building features.
+You also need everyone's laptop to be capable of running the project. If only one person can run it, only one person can build it.
+Who does what
+Role	Person	Responsibility this sprint
+Repo Owner	One nominated lead	Sets up branch protection, invites everyone, creates the project board.
+Backend Lead (future)	Whoever is most comfortable with terminals	Installs Node.js, PostgreSQL, Redis locally and confirms they all start.
+Web Lead (future)	Whoever is most comfortable with React	Gets the web app running on localhost:5173.
+Mobile Lead (future)	Whoever has a phone they can install Expo Go on	Gets the mobile app running on a real phone via Expo Go.
+Scribe	Rotates each sprint	Updates the project board and writes the demo notes at the end.
+You do not have to keep these roles forever. In fact, swap them every two sprints so everyone learns every part of the stack.
+Task 1: Make sure the GitHub repository is set up properly
+What you are doing: Configuring GitHub so that nobody (not even the owner) can accidentally break the main branch.
+Why: The main branch is your live, working code. If anyone can push anything to it, anyone can break it. With branch protection, every change is reviewed before merging.
+Steps:
+On GitHub, go to your FraudShield repository, then Settings, then Branches.
+Click "Add branch protection rule" (or "Add classic branch protection rule").
+In "Branch name pattern", type: main
+Tick "Require a pull request before merging".
+Tick "Require approvals" and set the number to 1.
+Tick "Require status checks to pass before merging" and select your CI checks (Lint, Test, Build) once they appear in the list.
+Tick "Do not allow bypassing the above settings".
+Click Create.
+What this means in practice
+Once this is set up, nobody can push directly to main. To make any change, you must:
+1. Create a branch with your name and a description, for example feature/akua-add-signin-validation.
+2. Push the branch and open a pull request.
+3. Another teammate reviews the code and clicks Approve.
+4. The CI pipeline must pass (lint, tests, build).
+5. Then GitHub will let you merge the pull request into main.
+This is how every serious team works. It feels slow at first. It saves you constantly.
+Task 2: Set up a project board for tracking work
+What you are doing: Creating a single place where everyone can see what is being worked on, by whom, and what is finished.
+Why: Without a board, work gets duplicated, things are forgotten, and nobody knows what the next priority is. With a board, the next task is always visible.
+Steps:
+On GitHub, go to your repository, click Projects, then New Project.
+Pick the Board template (with To Do, In Progress, Done columns). Add a "Review" column between In Progress and Done.
+Name the project "FraudShield Sprints".
+For each sprint in this guide, create issues in the repository for each numbered task. Title them like "S1-T2: Set up PostgreSQL locally".
+Add each issue to the board in the To Do column.
+When someone starts work on an issue, they assign it to themselves and move it to In Progress.
+When the pull request is open, move it to Review.
+When merged, move it to Done.
+Task 3: Establish the branching strategy
+You have two real choices for how to organise branches. Pick one and stick with it.
+Option A (recommended for your team): GitHub Flow.
+main is always working and always deployable.
+Every change starts as a branch from main.
+Open a pull request, get a review, merge to main.
+Simple and good for groups of three to six people.
+Option B: Git Flow (more complex, do not pick this).
+Used by larger teams. Adds develop, release, and hotfix branches. More moving parts. Skip this unless you have a clear reason.
+Branch naming convention you will use:
+Branch type	Example	When to use it
+feature/	feature/akua-admin-signin-api	Building something new
+fix/	fix/kojo-otp-typo	Fixing a bug
+docs/	docs/mina-update-readme	Editing documentation only
+chore/	chore/akosua-bump-deps	Maintenance tasks like updating packages
+Always include your name in the branch. When two people are pushing on the same day, this prevents collisions and makes blame (in the technical sense) clear.
+Task 4: Pull request and code review etiquette
+A pull request is a request to merge your branch into main. The review is how the team keeps quality up and shares knowledge.
+Rules for the person opening a pull request:
+Keep it small. A pull request with one focused change gets reviewed in 10 minutes. A pull request with 30 files gets ignored for three days.
+Write a clear title: S2-T3: Add admin signin endpoint with bcrypt verification
+Write a description that answers three questions: What does this change? Why? How did you test it?
+If your work is not finished but you want feedback, mark the PR as Draft.
+Do not approve your own pull request. Ask a teammate.
+Rules for the person reviewing a pull request:
+Pull the branch and run it. Do not just read the code in the browser.
+Be kind. Ask "could we try X" rather than "this is wrong".
+Catch obvious things: typos, console.log left in by mistake, files committed by accident.
+If the test suite is failing, do not approve until it passes.
+Hit Approve when you are happy. Hit "Request changes" if there is something serious to fix.
+Important habit
+Once the PR is approved AND the CI is green, the person who opened the PR is the one who clicks Merge. This way, they get to see their own work go live. It is a small thing, but it matters for morale.
+Task 5: Every laptop gets the project running
+Now every team member, on their own laptop, gets the existing project running. No exceptions.
+On each laptop, install these tools first:
+Git. Download from git-scm.com. Verify with: git --version
+Node.js (LTS version, 20 or higher). Download from nodejs.org. Verify with: node --version
+A code editor. VS Code is the standard. Download from code.visualstudio.com.
+Expo Go app on your phone. Search "Expo Go" on the Play Store or App Store.
+Then clone and run the web app:
+# Move to where you keep your code (create a folder if you do not have one)
+cd ~/Documents
+mkdir code
+cd code
+ 
+# Clone the repository (replace the URL with your actual repo URL)
+git clone https://github.com/your-org/fraud-shield.git
+cd fraud-shield
+ 
+# Install all dependencies (this takes 2 to 5 minutes the first time)
+npm install
+ 
+# Start the development server
+npm run dev
+ 
+# Open the URL it prints (usually http://localhost:5173) in your browser
+You should see the FraudShield landing page. Click around. The data is fake, but everything should work.
+Then run the mobile app:
+# In a NEW terminal window (keep the web one running)
+cd ~/Documents/code/fraud-shield/mobile
+npm install
+npx expo start
+ 
+# A QR code will appear in the terminal.
+# Open Expo Go on your phone and scan it.
+# Your phone and laptop must be on the same WiFi.
+The FraudShield mobile app should open on your phone. Tap around to confirm it works.
+Common problems
+"npm install" fails with permission errors: never use sudo. On macOS, set up nvm (node version manager) first.
+"expo start" cannot connect: check your laptop and phone are on the same WiFi network, and that your firewall is not blocking it.
+"port 5173 is in use": close the other terminal that is using it, or run "npm run dev -- --port 5174".
+On Windows, paths use backslashes. The commands shown use forward slashes which work in PowerShell and Git Bash.
+Task 6: Each team member opens and merges their first pull request
+This is a rite of passage. Every team member, individually, will make a tiny change and ship it through the full workflow. It is silly work but the muscle memory matters.
+Steps for each person (in turn, not all at once):
+Open a terminal in the project folder. Make sure main is up to date: git checkout main && git pull
+Create your branch: git checkout -b docs/yourname-add-name-to-readme
+Open README.md in VS Code. Find the "Authors" or "Team" section (or create one near the top). Add your name.
+Save the file. Stage and commit: git add README.md && git commit -m "docs: add my name to authors"
+Push your branch: git push -u origin docs/yourname-add-name-to-readme
+Go to GitHub. There will be a yellow banner saying "Compare and pull request". Click it.
+Fill in the title and description. Click "Create pull request".
+Wait for the CI to finish (about 1 to 3 minutes). It should pass.
+Ask a teammate to review. They click Approve.
+You click "Squash and merge". The branch is deleted automatically.
+Do this until every single person on the team has merged at least one pull request.
+Task 7: Decide your communication rhythm
+Software projects have invisible work. Decisions, blockers, questions, plans. If you only talk during meetings, things rot. Agree on these now:
+Daily async standup: In a group chat (WhatsApp, Slack, Discord), each person posts once a day with three lines: what I did yesterday, what I will do today, what is blocking me. Takes 30 seconds per person.
+Sprint kickoff: At the start of each sprint, the team has one 30 minute call to read the sprint goal together and split the tasks.
+Sprint demo: At the end of each sprint, the team has one 30 minute call where someone runs through the demo script and shows what works.
+Pull request response time: Try to review pull requests within 24 hours. If you cannot, comment to say so. Blocked teammates lose motivation fast.
+Definition of Done for Sprint 0
+Tick every box before moving to Sprint 1. Be honest. If any box is not ticked, finish it first.
+The GitHub repository has branch protection on main, requiring 1 approval and passing CI.
+There is a project board with sprint tasks added.
+Every team member has Node.js, Git, and a code editor installed.
+Every team member can run the web app locally and see the landing page.
+Every team member can run the mobile app on their phone via Expo Go.
+Every team member has opened, reviewed, and merged at least one pull request.
+The team has agreed on standup, kickoff, demo, and pull request response time rhythms.
+The README has every team member listed.
+Sprint 0 demo
+Get everyone on a call. Each person shares their screen and shows: the landing page running locally, their merged pull request on GitHub, and the mobile app on their phone. Five minutes per person. Celebrate this small win, because it is real and it means you are all unblocked.
+Part 2: Build the Backend
+The backend is the engine room. It is a program that runs on a server (a computer somewhere on the internet) and does three things:
+Stores data in a database (users, transactions, alerts, and so on).
+Decides who can see what (authentication and authorisation).
+Answers questions over HTTP from the web app and the mobile app.
+Right now your apps do not have a backend. They are running on hardcoded data. By the end of Part 2, you will have a real backend that the web and mobile apps can talk to.
+A quick mental model: imagine your apps are restaurants. Right now, every menu item has a fixed picture and the chefs do not actually cook. The backend is the kitchen, the storeroom (database), and the receipt system rolled into one. Once it is built, ordering a dish actually makes food appear.
+Sprint 1: Backend Skeleton and Database Schema
+Sprint goal
+You have a brand new Node.js backend folder with Express running on localhost:3000. It connects to a PostgreSQL database running locally, and that database has all the tables FraudShield needs (users, admins, transactions, alerts, blockchain entries, OTP codes, sessions, risk models, fraud scenarios). Hitting GET /api/health returns a JSON response that says "ok" and confirms the database is alive.
+Why this sprint matters
+Everything else in the project depends on a backend that exists, starts up, and can talk to a database. This is the foundation. We are not building features yet, just the floor that features will stand on.
+We are also choosing your stack now and committing to it. Changing your stack later is painful. The choice we recommend (Node.js, Express, PostgreSQL, Redis) is explained in your project review document, but the short version is: you already know JavaScript from the React work, PostgreSQL is the right database for financial data, and Redis is needed for OTP codes and rate limiting.
+Who does what
+Person	Responsibility
+Backend lead	Sets up the backend folder, installs Express, writes the health endpoint, writes the database connection.
+Second pair	Sets up Docker Compose so PostgreSQL and Redis run with one command, and writes the database schema (the SQL that creates the tables).
+Third person	Reviews the schema, writes seed data (a few fake admins and customers for development), updates the README.
+Rest of the team	Reviews the pull request, runs the backend locally to confirm it works on their laptop too.
+Task 1: Create the backend folder structure
+What you are doing: Adding a new folder called "backend" inside your existing repository. The web app, mobile app, and backend will all live in the same repo. This is called a monorepo.
+Why one repo: It is easier to keep types and shared logic consistent. You have one place to clone, one CI pipeline, one set of pull requests to review. For a project this size, a monorepo is the right choice.
+Steps:
+# Start from the project root
+cd ~/Documents/code/fraud-shield
+ 
+# Make sure you are on a fresh branch
+git checkout main
+git pull
+git checkout -b feature/yourname-backend-skeleton
+ 
+# Create the backend folder and step into it
+mkdir backend
+cd backend
+ 
+# Initialise a new Node.js project
+npm init -y
+ 
+# Install the runtime packages we need
+npm install express cors helmet morgan dotenv pg redis bcrypt jsonwebtoken speakeasy zod
+ 
+# Install development packages
+npm install --save-dev nodemon vitest supertest
+What each package does:
+Package	Why we need it
+express	The web framework. It is the thing that handles HTTP requests.
+cors	Lets your web app talk to your backend from a different port without the browser blocking it.
+helmet	Sets safe HTTP headers automatically. Cheap security win.
+morgan	Logs every incoming request to the console. Helpful when debugging.
+dotenv	Reads secrets and configuration from a .env file.
+pg	The PostgreSQL driver. Lets your Node code talk to the database.
+redis	The Redis client. We will use this for OTP codes and rate limiting.
+bcrypt	Hashes passwords and PINs safely so we never store them in plain text.
+jsonwebtoken	Creates and verifies JWTs (the tokens admins use after they log in).
+speakeasy	Generates and verifies TOTP codes (the 6 digit codes from Google Authenticator).
+zod	Validates incoming request bodies. We already use it on the frontend.
+nodemon (dev)	Restarts the server automatically when you change a file.
+vitest (dev)	The test runner. Same one you already use on the web app.
+supertest (dev)	Lets you make fake HTTP requests in tests to check your API works.
+Now create the folder structure:
+# Inside the backend folder
+mkdir src
+mkdir src/config src/db src/middleware src/routes src/services src/utils src/errors
+mkdir tests
+touch src/server.js src/app.js
+touch src/db/pool.js src/db/redis.js
+touch src/routes/health.js
+touch .env .env.example .gitignore
+What each folder is for:
+src/config: reads environment variables and exports a clean config object.
+src/db: database and Redis connections.
+src/middleware: functions that run on every request (authentication checks, rate limiting, error catching).
+src/routes: one file per feature area, for example auth.js, transactions.js, alerts.js.
+src/services: the business logic. Routes call services. Services talk to the database.
+src/utils: helpers used by multiple parts of the backend.
+src/errors: your custom error classes (you can copy these from the existing src/errors folder).
+tests: test files for the backend.
+Task 2: Set up PostgreSQL and Redis locally with Docker
+What you are doing: Running PostgreSQL and Redis on your laptop using Docker, so you do not have to install them directly.
+Why Docker: Installing PostgreSQL natively on macOS, Windows, and Linux all look different and break in different ways. Docker gives every team member the exact same database with one command. Docker is one of the most important tools in modern software, learning it now pays off forever.
+Install Docker Desktop first: Go to docker.com, download Docker Desktop for your operating system, install it, and start the application. You will know it is running when there is a whale icon in your taskbar.
+Then create a docker-compose.yml file in the backend folder:
+# backend/docker-compose.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fraudshield-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fraudshield
+      POSTGRES_PASSWORD: dev_password_change_in_prod
+      POSTGRES_DB: fraudshield_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+ 
+  redis:
+    image: redis:7-alpine
+    container_name: fraudshield-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+ 
+volumes:
+  postgres_data:
+  redis_data:
+Now start them:
+cd backend
+docker compose up -d
+ 
+# To check they are running:
+docker compose ps
+ 
+# To stop them later when you are done coding:
+# docker compose down
+What just happened
+Docker downloaded the PostgreSQL and Redis images (small versions called "alpine") and started them as containers. A container is like a tiny isolated computer running just that one program. The "ports" lines mean: take port 5432 inside the PostgreSQL container and make it available as port 5432 on your laptop. So Node.js connects to localhost:5432, and Docker routes it to PostgreSQL.
+
+The "volumes" lines mean: when you stop and start the containers, your data is preserved on your laptop. Without this, you would lose everything every time you restart Docker.
+Task 3: Configure environment variables
+What you are doing: Putting all the changeable settings (passwords, connection strings, secrets) into a file called .env so they are not hardcoded in the source code.
+Why: Two reasons. First, you never want to commit secrets to GitHub (anyone who sees the repo could log in as you). Second, the values are different on your laptop vs the live server. A .env file solves both.
+Create backend/.env (this file is gitignored):
+# backend/.env (NEVER commit this file)
+NODE_ENV=development
+PORT=3000
+ 
+# Database
+DATABASE_URL=postgresql://fraudshield:dev_password_change_in_prod@localhost:5432/fraudshield_dev
+ 
+# Redis
+REDIS_URL=redis://localhost:6379
+ 
+# JWT secrets (generate real ones with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
+JWT_SECRET=replace_this_with_a_long_random_string_at_least_64_chars
+JWT_REFRESH_SECRET=replace_this_with_a_DIFFERENT_long_random_string
+JWT_EXPIRY=15m
+JWT_REFRESH_EXPIRY=7d
+ 
+# Password hashing
+BCRYPT_ROUNDS=12
+ 
+# Allowed CORS origins (comma separated)
+CORS_ORIGINS=http://localhost:5173
+ 
+# Ghana SMS (leave blank for now, we wire it in Sprint 3)
+ARKESEL_API_KEY=
+Create backend/.env.example (this file IS committed, with empty values):
+# backend/.env.example (commit this so new team members know what to set)
+NODE_ENV=development
+PORT=3000
+DATABASE_URL=
+REDIS_URL=
+JWT_SECRET=
+JWT_REFRESH_SECRET=
+JWT_EXPIRY=15m
+JWT_REFRESH_EXPIRY=7d
+BCRYPT_ROUNDS=12
+CORS_ORIGINS=http://localhost:5173
+ARKESEL_API_KEY=
+Update backend/.gitignore so secrets stay local:
+# backend/.gitignore
+node_modules/
+.env
+.env.local
+.env.*.local
+*.log
+coverage/
+dist/
+Critical: never commit a .env file
+If you accidentally commit a .env file with real secrets, do not just delete it in the next commit. Git remembers history. You must:
+1. Remove it from history with git filter-repo or BFG Repo Cleaner.
+2. Rotate every secret that was in the file (generate new ones).
+3. Force push (and tell the team).
+Easier: read the gitignore before you commit, and use git status to confirm .env is not staged.
+Task 4: Build the database schema
+What you are doing: Writing SQL that creates the tables FraudShield needs.
+Why we hand write SQL (and do not use an ORM yet): For a small backend, raw SQL is clearer, easier to reason about, and you learn the database properly. ORMs (like Prisma or Sequelize) add magic that hides bugs and makes you a worse engineer until you understand SQL. You can move to one later.
+Create backend/src/db/migrations/001_initial_schema.sql:
+-- backend/src/db/migrations/001_initial_schema.sql
+-- Initial FraudShield schema
+ 
+-- Extension for UUIDs
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+ 
+-- ======================================
+-- Admins (the people using the web app)
+-- ======================================
+CREATE TABLE admins (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email         TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  full_name     TEXT NOT NULL,
+  role          TEXT NOT NULL DEFAULT 'analyst',  -- analyst | supervisor | super_admin
+  mfa_secret    TEXT,                              -- encrypted TOTP secret
+  mfa_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
+  status        TEXT NOT NULL DEFAULT 'active',   -- active | suspended | deleted
+  last_login_at TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ 
+-- ======================================
+-- Users (mobile money customers)
+-- ======================================
+CREATE TABLE users (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  phone_number  TEXT UNIQUE NOT NULL,
+  pin_hash      TEXT,
+  full_name     TEXT NOT NULL,
+  balance       NUMERIC(14,2) NOT NULL DEFAULT 0,
+  trust_score   INTEGER NOT NULL DEFAULT 50,  -- 0-100
+  mfa_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
+  status        TEXT NOT NULL DEFAULT 'active',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ 
+CREATE INDEX idx_users_phone ON users(phone_number);
+ 
+-- ======================================
+-- Transactions
+-- ======================================
+CREATE TABLE transactions (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  reference         TEXT UNIQUE NOT NULL,
+  sender_id         UUID NOT NULL REFERENCES users(id),
+  recipient_phone   TEXT NOT NULL,
+  recipient_id      UUID REFERENCES users(id),
+  amount            NUMERIC(14,2) NOT NULL,
+  currency          TEXT NOT NULL DEFAULT 'GHS',
+  category          TEXT NOT NULL DEFAULT 'P2P',  -- P2P | AGENT | MERCHANT
+  risk_score        INTEGER NOT NULL DEFAULT 0,
+  ai_flagged        BOOLEAN NOT NULL DEFAULT FALSE,
+  status            TEXT NOT NULL DEFAULT 'pending', -- pending | safe | review | blocked | completed | failed
+  blockchain_hash   TEXT,
+  metadata          JSONB,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at      TIMESTAMPTZ
+);
+ 
+CREATE INDEX idx_transactions_sender ON transactions(sender_id);
+CREATE INDEX idx_transactions_status ON transactions(status);
+CREATE INDEX idx_transactions_created ON transactions(created_at DESC);
+ 
+-- ======================================
+-- Alerts (fraud notifications for the admin team)
+-- ======================================
+CREATE TABLE alerts (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  type            TEXT NOT NULL,  -- sim_swap | phishing | reversal | takeover | unusual_amount
+  title           TEXT NOT NULL,
+  description     TEXT,
+  severity        TEXT NOT NULL,  -- low | medium | high | critical
+  user_id         UUID REFERENCES users(id),
+  transaction_id  UUID REFERENCES transactions(id),
+  read            BOOLEAN NOT NULL DEFAULT FALSE,
+  resolved        BOOLEAN NOT NULL DEFAULT FALSE,
+  resolved_by     UUID REFERENCES admins(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  resolved_at     TIMESTAMPTZ
+);
+ 
+-- ======================================
+-- Blockchain audit trail (append-only)
+-- ======================================
+CREATE TABLE blockchain_entries (
+  id              BIGSERIAL PRIMARY KEY,
+  hash            TEXT NOT NULL UNIQUE,
+  previous_hash   TEXT,
+  event_type      TEXT NOT NULL,  -- transaction | auth | admin_action
+  transaction_id  UUID REFERENCES transactions(id),
+  payload         JSONB NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ 
+CREATE INDEX idx_blockchain_created ON blockchain_entries(created_at);
+ 
+-- ======================================
+-- OTP codes (stored hashed, with expiry)
+-- ======================================
+CREATE TABLE otp_codes (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id     UUID REFERENCES users(id),
+  phone       TEXT,
+  code_hash   TEXT NOT NULL,
+  purpose     TEXT NOT NULL,  -- signin | signup | password_reset
+  expires_at  TIMESTAMPTZ NOT NULL,
+  used        BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ 
+CREATE INDEX idx_otp_phone_purpose ON otp_codes(phone, purpose) WHERE used = FALSE;
+ 
+-- ======================================
+-- Sessions (active refresh tokens)
+-- ======================================
+CREATE TABLE sessions (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id             UUID REFERENCES users(id),
+  admin_id            UUID REFERENCES admins(id),
+  token_hash          TEXT NOT NULL,
+  device_fingerprint  TEXT,
+  ip_address          TEXT,
+  expires_at          TIMESTAMPTZ NOT NULL,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK ((user_id IS NOT NULL) OR (admin_id IS NOT NULL))
+);
+ 
+-- ======================================
+-- Risk model configurations
+-- ======================================
+CREATE TABLE risk_models (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name              TEXT NOT NULL,
+  version           TEXT NOT NULL,
+  accuracy          NUMERIC(5,2),
+  status            TEXT NOT NULL DEFAULT 'active',  -- active | inactive | training
+  config            JSONB NOT NULL,  -- threshold values, rule weights
+  last_trained_at   TIMESTAMPTZ,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ 
+-- ======================================
+-- Fraud scenarios (for the mobile simulator)
+-- ======================================
+CREATE TABLE fraud_scenarios (
+  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  type         TEXT NOT NULL,
+  title        TEXT NOT NULL,
+  description  TEXT,
+  severity     TEXT NOT NULL,
+  steps        JSONB NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+Why these specific design choices
+UUIDs as primary keys: hard to guess, work well across systems, and you can generate them anywhere (no need to ask the database for the next ID).
+TIMESTAMPTZ everywhere: stores the time zone, so you never have ambiguity about whether a time is in Accra or UTC.
+NUMERIC(14,2) for money: never use FLOAT for currency. Floating point rounding errors will cost real money.
+JSONB columns for metadata: flexible structured data without needing a new table for every variation.
+Foreign keys: PostgreSQL will refuse to insert a transaction with a sender_id that does not exist in users. The database enforces correctness.
+Indexes on commonly queried columns: makes lookups fast as the data grows.
+Task 5: Write code that connects to the database and Redis
+Create backend/src/db/pool.js:
+// backend/src/db/pool.js
+// A single shared PostgreSQL connection pool for the whole backend.
+ 
+import pg from 'pg';
+import 'dotenv/config';
+ 
+const { Pool } = pg;
+ 
+// A "pool" is a small set of reusable database connections.
+// Without a pool, every query would open and close a connection (slow).
+// With a pool, connections are reused (fast).
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,                     // up to 20 concurrent connections
+  idleTimeoutMillis: 30000,    // close idle connections after 30 seconds
+});
+ 
+pool.on('error', (err) => {
+  console.error('Unexpected database pool error:', err);
+});
+ 
+// Helper to run a single query and return the rows
+export async function query(text, params) {
+  const result = await pool.query(text, params);
+  return result.rows;
+}
+ 
+// Helper for transactions (begin, run things, commit, or rollback on error)
+export async function withTransaction(callback) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+Create backend/src/db/redis.js:
+// backend/src/db/redis.js
+import { createClient } from 'redis';
+import 'dotenv/config';
+ 
+export const redis = createClient({ url: process.env.REDIS_URL });
+ 
+redis.on('error', (err) => console.error('Redis error:', err));
+ 
+export async function connectRedis() {
+  if (!redis.isOpen) await redis.connect();
+}
+Task 6: Write the Express server
+Create backend/src/app.js (the Express application):
+// backend/src/app.js
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import 'dotenv/config';
+ 
+import healthRouter from './routes/health.js';
+ 
+const app = express();
+ 
+// Security headers (helmet does the heavy lifting)
+app.use(helmet());
+ 
+// Allow cross origin requests from our web app
+const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
+ 
+// Parse JSON bodies
+app.use(express.json({ limit: '1mb' }));
+ 
+// Log every request in dev
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+}
+ 
+// Routes
+app.use('/api/health', healthRouter);
+ 
+// 404 handler for unknown routes
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not found', path: req.originalUrl });
+});
+ 
+// Central error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error',
+  });
+});
+ 
+export default app;
+Create backend/src/server.js (the file you actually run):
+// backend/src/server.js
+import app from './app.js';
+import { pool } from './db/pool.js';
+import { connectRedis } from './db/redis.js';
+ 
+const PORT = process.env.PORT || 3000;
+ 
+async function start() {
+  await pool.query('SELECT 1');         // confirms DB is reachable
+  await connectRedis();                  // connects to Redis
+ 
+  app.listen(PORT, () => {
+    console.log(`FraudShield API running on http://localhost:${PORT}`);
+  });
+}
+ 
+start().catch((err) => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
+Create backend/src/routes/health.js:
+// backend/src/routes/health.js
+import { Router } from 'express';
+import { pool } from '../db/pool.js';
+import { redis } from '../db/redis.js';
+ 
+const router = Router();
+ 
+router.get('/', async (req, res) => {
+  const checks = { api: 'ok' };
+  try { await pool.query('SELECT 1'); checks.db = 'ok'; }
+  catch { checks.db = 'down'; }
+  try { await redis.ping(); checks.redis = 'ok'; }
+  catch { checks.redis = 'down'; }
+ 
+  const healthy = Object.values(checks).every(v => v === 'ok');
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'healthy' : 'degraded',
+    checks,
+    timestamp: new Date().toISOString(),
+  });
+});
+ 
+export default router;
+Update backend/package.json scripts to make running the server easy:
+"scripts": {
+  "dev": "nodemon --watch src --ext js,json src/server.js",
+  "start": "node src/server.js",
+  "test": "vitest run",
+  "test:watch": "vitest",
+  "db:migrate": "psql $DATABASE_URL -f src/db/migrations/001_initial_schema.sql"
+},
+"type": "module"
+Important: "type": "module"
+Add this line to backend/package.json at the top level. It tells Node that this folder uses modern import/export syntax instead of older require(). All the code in this guide uses import/export.
+Task 7: Run the migration and start the server
+# Make sure Docker containers are running
+docker compose up -d
+ 
+# Run the migration (creates the tables)
+npm run db:migrate
+ 
+# Start the dev server
+npm run dev
+In another terminal, hit the health endpoint:
+curl http://localhost:3000/api/health
+ 
+# Expected output:
+# {"status":"healthy","checks":{"api":"ok","db":"ok","redis":"ok"},"timestamp":"..."}
+Task 8: Write a seed script for development data
+What you are doing: Inserting some fake admins and users into the database so you can develop without manually creating them every time.
+Create backend/src/db/seed.js:
+// backend/src/db/seed.js
+// Run with: node src/db/seed.js
+import bcrypt from 'bcrypt';
+import { pool } from './pool.js';
+ 
+async function seed() {
+  const password = await bcrypt.hash('Password123!', 12);
+  await pool.query(
+    `INSERT INTO admins (email, password_hash, full_name, role)
+     VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING`,
+    ['admin@fraudshield.test', password, 'Test Admin', 'super_admin']
+  );
+ 
+  const pin = await bcrypt.hash('1234', 12);
+  await pool.query(
+    `INSERT INTO users (phone_number, pin_hash, full_name, balance)
+     VALUES ($1, $2, $3, $4) ON CONFLICT (phone_number) DO NOTHING`,
+    ['+233200000001', pin, 'Akua Mensah', 1500.00]
+  );
+ 
+  console.log('Seed complete.');
+  await pool.end();
+}
+ 
+seed().catch((err) => { console.error(err); process.exit(1); });
+Add to package.json: "db:seed": "node src/db/seed.js"
+Run it: npm run db:seed
+Definition of Done for Sprint 1
+There is a backend folder in the repository with package.json, src/ structure, .env.example committed, and .env in gitignore.
+docker-compose.yml is committed and "docker compose up -d" starts PostgreSQL and Redis cleanly on every team member's laptop.
+The migration SQL runs and creates all nine tables.
+"npm run dev" starts the server on localhost:3000.
+GET /api/health returns {"status":"healthy",...} when DB and Redis are up, and {"status":"degraded",...} when one is down.
+"npm run db:seed" inserts one admin and one user.
+A pull request with all this code has been opened, reviewed, and merged.
+Every team member has run the backend on their own laptop and seen the health response.
+Sprint 1 demo
+On the call: open three terminals. In the first, run docker compose up. In the second, run npm run dev. In the third, run curl on the health endpoint and show the JSON response. Then open Postgres in a GUI tool like TablePlus or DBeaver and show the empty tables. Five minutes, very satisfying.
+Sprint 2: Admin Authentication (Email, Password, and TOTP)
+Sprint goal
+A seeded admin can hit POST /api/auth/admin/signin with their email and password, get back a temporary "MFA required" token, then hit POST /api/auth/admin/verify-mfa with a 6 digit code from Google Authenticator, and receive a short lived access JWT plus a long lived refresh token. Hitting GET /api/auth/me with that access JWT returns the admin's profile. Failed logins are rate limited.
+Why this sprint matters
+This is the unblocker for everything else. The PDF review document calls it the critical path, and it is right. Without working admin auth, you cannot meaningfully connect the web app to the backend. Until this sprint is finished, the web app cannot do anything useful with real data.
+We are also setting the pattern for how authentication works in your codebase. Once admin auth is done, customer auth in Sprint 3 follows the same shape with two differences (phone instead of email, and SMS OTP instead of TOTP).
+Background: what is JWT, what is TOTP, why do we need both?
+JWT (JSON Web Token): A string that proves you are who you say you are. After a successful login, the server gives the client (web or mobile app) a JWT. On every later request, the client sends the JWT in the Authorization header. The server verifies the signature using its secret and trusts the claims inside (like "this user is admin id 123"). JWTs are short lived (15 minutes) so that if one is stolen, the damage is limited.
+Refresh tokens: A second, long lived token that lets the client get a new access JWT without re entering the password. Stored as an httpOnly cookie so JavaScript on the page cannot read it (defends against cross site scripting).
+TOTP (Time based One Time Password): The 6 digit code that Google Authenticator and Authy generate. It changes every 30 seconds and is based on a shared secret between the server and the app. Even if someone steals your password, they cannot log in without the current code from your phone. This is called "two factor authentication" or 2FA.
+Why both: A password proves you "know something". A TOTP proves you "have something" (your phone). Requiring both is dramatically more secure than passwords alone, and is industry standard for any system handling financial data.
+Who does what
+Person	Responsibility
+Lead	Sets up the auth folder structure, writes the password and JWT helpers, writes the signin endpoint.
+Second	Writes the MFA setup endpoint (generates the TOTP secret and QR code) and the verify endpoint.
+Third	Writes the rate limiting middleware and the GET /api/auth/me endpoint.
+Fourth	Writes tests for all auth endpoints. The auth code is the most security sensitive part of the system, it must be tested.
+Task 1: Set up the auth folder
+# In the backend folder
+mkdir -p src/services/auth
+touch src/services/auth/password.js
+touch src/services/auth/tokens.js
+touch src/services/auth/mfa.js
+touch src/routes/auth.js
+touch src/middleware/authenticate.js
+touch src/middleware/rateLimit.js
+Task 2: Password and token helpers
+Create backend/src/services/auth/password.js:
+// backend/src/services/auth/password.js
+import bcrypt from 'bcrypt';
+ 
+const ROUNDS = Number(process.env.BCRYPT_ROUNDS || 12);
+ 
+// Turns a plain text password into a hash that is safe to store.
+// Bcrypt is intentionally slow, which makes brute force attacks impractical.
+export async function hashPassword(plain) {
+  return bcrypt.hash(plain, ROUNDS);
+}
+ 
+// Compares a plain text password against a stored hash.
+// Returns true if they match, false otherwise.
+export async function verifyPassword(plain, hash) {
+  if (!plain || !hash) return false;
+  return bcrypt.compare(plain, hash);
+}
+Create backend/src/services/auth/tokens.js:
+// backend/src/services/auth/tokens.js
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { pool } from '../../db/pool.js';
+ 
+const ACCESS_SECRET  = process.env.JWT_SECRET;
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+const ACCESS_EXPIRY  = process.env.JWT_EXPIRY || '15m';
+const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
+ 
+// An access token. Short lived, sent on every request.
+export function signAccessToken(payload) {
+  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ACCESS_EXPIRY });
+}
+ 
+// Verifies and returns the payload inside an access token.
+export function verifyAccessToken(token) {
+  return jwt.verify(token, ACCESS_SECRET);
+}
+ 
+// A refresh token. Long lived. Stored hashed in the database.
+// We hash it because if the database leaks, the raw token should not be usable.
+export async function issueRefreshToken({ adminId, userId, ip, fingerprint }) {
+  const raw = crypto.randomBytes(48).toString('hex');
+  const hash = crypto.createHash('sha256').update(raw).digest('hex');
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+ 
+  await pool.query(
+    `INSERT INTO sessions (admin_id, user_id, token_hash, ip_address, device_fingerprint, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [adminId || null, userId || null, hash, ip || null, fingerprint || null, expiresAt]
+  );
+  return raw;
+}
+ 
+export async function revokeRefreshToken(raw) {
+  const hash = crypto.createHash('sha256').update(raw).digest('hex');
+  await pool.query('DELETE FROM sessions WHERE token_hash = $1', [hash]);
+}
+ 
+export async function findSessionByRefresh(raw) {
+  const hash = crypto.createHash('sha256').update(raw).digest('hex');
+  const result = await pool.query(
+    'SELECT * FROM sessions WHERE token_hash = $1 AND expires_at > NOW()',
+    [hash]
+  );
+  return result.rows[0] || null;
+}
+Task 3: TOTP (Google Authenticator) helpers
+Create backend/src/services/auth/mfa.js:
+// backend/src/services/auth/mfa.js
+import speakeasy from 'speakeasy';
+ 
+// Generates a fresh TOTP secret. Each admin gets their own.
+// The secret never changes once set.
+export function generateMfaSecret(label) {
+  return speakeasy.generateSecret({
+    name: `FraudShield (${label})`,
+    length: 20,
+  });
+  // Returns { ascii, hex, base32, otpauth_url }
+}
+ 
+// Verifies a 6 digit code against the stored secret.
+// "window: 1" means we accept codes from the previous, current, and next 30 second window,
+// which compensates for tiny clock differences between server and phone.
+export function verifyMfaCode(secret, code) {
+  return speakeasy.totp.verify({
+    secret,
+    encoding: 'base32',
+    token: code,
+    window: 1,
+  });
+}
+Task 4: Rate limiting middleware
+What you are doing: Stopping attackers from trying thousands of passwords. If someone makes 5 failed attempts in 15 minutes, the 6th attempt is rejected without even checking the password.
+Why Redis: Redis is fast and supports counters with expiry. Perfect for "how many attempts has this IP made in the last 15 minutes".
+Create backend/src/middleware/rateLimit.js:
+// backend/src/middleware/rateLimit.js
+import { redis } from '../db/redis.js';
+ 
+// Returns middleware that blocks more than `max` requests per `windowSec`
+// from the same key (usually email or IP).
+export function rateLimit({ keyPrefix, max, windowSec, getKey }) {
+  return async (req, res, next) => {
+    const id = getKey(req);
+    if (!id) return next();
+ 
+    const key = `rl:${keyPrefix}:${id}`;
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, windowSec);
+ 
+    if (count > max) {
+      return res.status(429).json({
+        error: 'Too many requests, please try again later.',
+        retryAfterSec: windowSec,
+      });
+    }
+    next();
+  };
+}
+Task 5: The signin and MFA routes
+Create backend/src/routes/auth.js:
+// backend/src/routes/auth.js
+import { Router } from 'express';
+import { z } from 'zod';
+import { pool } from '../db/pool.js';
+import { verifyPassword } from '../services/auth/password.js';
+import {
+  signAccessToken, verifyAccessToken,
+  issueRefreshToken, revokeRefreshToken, findSessionByRefresh
+} from '../services/auth/tokens.js';
+import { generateMfaSecret, verifyMfaCode } from '../services/auth/mfa.js';
+import { rateLimit } from '../middleware/rateLimit.js';
+ 
+const router = Router();
+ 
+// Limit failed login attempts per email to 5 per 15 minutes
+const signinLimiter = rateLimit({
+  keyPrefix: 'admin_signin',
+  max: 5,
+  windowSec: 15 * 60,
+  getKey: (req) => (req.body?.email || '').toLowerCase().trim(),
+});
+ 
+// Schemas
+const signinSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+ 
+const verifyMfaSchema = z.object({
+  pendingToken: z.string(),
+  code: z.string().length(6),
+});
+ 
+// ===========================
+// POST /api/auth/admin/signin
+// ===========================
+router.post('/admin/signin', signinLimiter, async (req, res) => {
+  const parsed = signinSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+  }
+  const { email, password } = parsed.data;
+ 
+  const result = await pool.query('SELECT * FROM admins WHERE email = $1', [email]);
+  const admin = result.rows[0];
+ 
+  // IMPORTANT: always do the bcrypt compare even if the user does not exist,
+  // so attackers cannot time the response to find out which emails exist.
+  const dummyHash = '$2b$12$abcdefghijklmnopqrstuv';
+  const ok = await verifyPassword(password, admin?.password_hash || dummyHash);
+  if (!admin || !ok || admin.status !== 'active') {
+    return res.status(401).json({ error: 'Invalid email or password' });
+  }
+ 
+  // If MFA is not yet set up, return a special response so the client can show the QR code
+  if (!admin.mfa_enabled || !admin.mfa_secret) {
+    const secret = generateMfaSecret(admin.email);
+    await pool.query(
+      'UPDATE admins SET mfa_secret = $1 WHERE id = $2',
+      [secret.base32, admin.id]
+    );
+    return res.json({
+      status: 'mfa_setup_required',
+      otpauthUrl: secret.otpauth_url,
+      pendingToken: signAccessToken({ sub: admin.id, type: 'mfa_pending' }),
+    });
+  }
+ 
+  // Otherwise, ask for the 6 digit code
+  return res.json({
+    status: 'mfa_required',
+    pendingToken: signAccessToken({ sub: admin.id, type: 'mfa_pending' }),
+  });
+});
+ 
+// =================================
+// POST /api/auth/admin/verify-mfa
+// =================================
+router.post('/admin/verify-mfa', async (req, res) => {
+  const parsed = verifyMfaSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid input' });
+  const { pendingToken, code } = parsed.data;
+ 
+  let payload;
+  try { payload = verifyAccessToken(pendingToken); }
+  catch { return res.status(401).json({ error: 'Pending token invalid or expired' }); }
+  if (payload.type !== 'mfa_pending') return res.status(401).json({ error: 'Wrong token type' });
+ 
+  const result = await pool.query('SELECT * FROM admins WHERE id = $1', [payload.sub]);
+  const admin = result.rows[0];
+  if (!admin) return res.status(401).json({ error: 'Admin not found' });
+ 
+  if (!verifyMfaCode(admin.mfa_secret, code)) {
+    return res.status(401).json({ error: 'Invalid MFA code' });
+  }
+ 
+  // First successful verification enables MFA
+  if (!admin.mfa_enabled) {
+    await pool.query('UPDATE admins SET mfa_enabled = TRUE WHERE id = $1', [admin.id]);
+  }
+ 
+  await pool.query('UPDATE admins SET last_login_at = NOW() WHERE id = $1', [admin.id]);
+ 
+  const accessToken = signAccessToken({
+    sub: admin.id,
+    type: 'admin',
+    role: admin.role,
+    email: admin.email,
+  });
+  const refreshToken = await issueRefreshToken({
+    adminId: admin.id,
+    ip: req.ip,
+    fingerprint: req.headers['user-agent'] || null,
+  });
+ 
+  // Refresh token in an httpOnly cookie
+  res.cookie('refresh_token', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/api/auth',
+  });
+ 
+  res.json({
+    status: 'ok',
+    accessToken,
+    admin: {
+      id: admin.id, email: admin.email, fullName: admin.full_name, role: admin.role,
+    },
+  });
+});
+ 
+// =====================================
+// POST /api/auth/refresh
+// =====================================
+router.post('/refresh', async (req, res) => {
+  const raw = req.cookies?.refresh_token;
+  if (!raw) return res.status(401).json({ error: 'No refresh token' });
+ 
+  const session = await findSessionByRefresh(raw);
+  if (!session) return res.status(401).json({ error: 'Invalid or expired refresh token' });
+ 
+  const isAdmin = !!session.admin_id;
+  const row = await pool.query(
+    isAdmin ? 'SELECT * FROM admins WHERE id = $1' : 'SELECT * FROM users WHERE id = $1',
+    [session.admin_id || session.user_id]
+  );
+  const principal = row.rows[0];
+  if (!principal) return res.status(401).json({ error: 'Account no longer exists' });
+ 
+  const accessToken = signAccessToken({
+    sub: principal.id,
+    type: isAdmin ? 'admin' : 'user',
+    role: principal.role,
+    email: principal.email,
+  });
+  res.json({ accessToken });
+});
+ 
+// =====================================
+// POST /api/auth/signout
+// =====================================
+router.post('/signout', async (req, res) => {
+  const raw = req.cookies?.refresh_token;
+  if (raw) await revokeRefreshToken(raw);
+  res.clearCookie('refresh_token', { path: '/api/auth' });
+  res.json({ status: 'ok' });
+});
+ 
+export default router;
+Install cookie-parser so we can read cookies:
+npm install cookie-parser
+Then add to backend/src/app.js, right after the JSON parser:
+import cookieParser from 'cookie-parser';
+app.use(cookieParser());
+ 
+// And register the auth router:
+import authRouter from './routes/auth.js';
+app.use('/api/auth', authRouter);
+Task 6: The authenticate middleware (proves a request is from a logged in user)
+Create backend/src/middleware/authenticate.js:
+// backend/src/middleware/authenticate.js
+import { verifyAccessToken } from '../services/auth/tokens.js';
+ 
+// Reads the Authorization: Bearer <token> header and attaches req.principal.
+// Use this on any route that requires a logged in user.
+export function authenticate(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Missing access token' });
+ 
+  try {
+    const payload = verifyAccessToken(token);
+    if (payload.type !== 'admin' && payload.type !== 'user') {
+      return res.status(401).json({ error: 'Wrong token type' });
+    }
+    req.principal = payload;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired access token' });
+  }
+}
+ 
+// Limits a route to admins only
+export function requireAdmin(req, res, next) {
+  if (req.principal?.type !== 'admin') return res.status(403).json({ error: 'Admins only' });
+  next();
+}
+ 
+// Limits a route to specific roles
+export function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.principal?.role)) return res.status(403).json({ error: 'Insufficient role' });
+    next();
+  };
+}
+Task 7: GET /api/auth/me (returns the current admin's profile)
+Add to the bottom of backend/src/routes/auth.js, before the export:
+import { authenticate } from '../middleware/authenticate.js';
+ 
+router.get('/me', authenticate, async (req, res) => {
+  const isAdmin = req.principal.type === 'admin';
+  const result = await pool.query(
+    isAdmin
+      ? 'SELECT id, email, full_name, role, last_login_at FROM admins WHERE id = $1'
+      : 'SELECT id, phone_number, full_name, balance, trust_score FROM users WHERE id = $1',
+    [req.principal.sub]
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: 'Account not found' });
+  res.json(result.rows[0]);
+});
+Task 8: Test the whole flow manually
+Restart the server (npm run dev), then in a terminal:
+# Step 1: Try to sign in (should ask for MFA setup the first time)
+curl -i -X POST http://localhost:3000/api/auth/admin/signin \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{"email":"admin@fraudshield.test","password":"Password123!"}'
+ 
+# You will see a response with "status":"mfa_setup_required" and an otpauthUrl.
+# Copy that URL into a QR code generator (or paste in Google Authenticator manually).
+# Once you have the 6 digit code from Google Authenticator:
+ 
+# Step 2: Verify MFA
+curl -i -X POST http://localhost:3000/api/auth/admin/verify-mfa \
+  -H "Content-Type: application/json" \
+  -b cookies.txt -c cookies.txt \
+  -d '{"pendingToken":"...","code":"123456"}'
+ 
+# You should get back an accessToken.
+ 
+# Step 3: Use the access token
+curl -i http://localhost:3000/api/auth/me \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN_HERE"
+ 
+# You should see the admin profile.
+How to get the QR code
+The otpauthUrl looks like "otpauth://totp/FraudShield...". To turn it into a QR code, paste it into any free QR code generator online (or use a npm tool like qrcode-terminal during dev).
+
+Or open Google Authenticator on your phone, tap the plus sign, choose "Enter setup key", and type in the base32 secret manually. Either way, once it is added, your phone will show a rotating 6 digit code for FraudShield.
+Task 9: Write the tests
+Create backend/tests/auth.test.js:
+// backend/tests/auth.test.js
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import request from 'supertest';
+import app from '../src/app.js';
+import { pool } from '../src/db/pool.js';
+import bcrypt from 'bcrypt';
+ 
+const TEST_EMAIL = 'test-admin@fraudshield.test';
+ 
+beforeAll(async () => {
+  const password = await bcrypt.hash('TestPassword123!', 4);
+  await pool.query(
+    `INSERT INTO admins (email, password_hash, full_name, role)
+     VALUES ($1, $2, $3, $4) ON CONFLICT (email) DO NOTHING`,
+    [TEST_EMAIL, password, 'Test', 'analyst']
+  );
+});
+ 
+afterAll(async () => {
+  await pool.query('DELETE FROM admins WHERE email = $1', [TEST_EMAIL]);
+  await pool.end();
+});
+ 
+describe('POST /api/auth/admin/signin', () => {
+  it('returns mfa_setup_required for a new admin', async () => {
+    const res = await request(app)
+      .post('/api/auth/admin/signin')
+      .send({ email: TEST_EMAIL, password: 'TestPassword123!' });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('mfa_setup_required');
+    expect(res.body.pendingToken).toBeDefined();
+  });
+ 
+  it('rejects wrong password', async () => {
+    const res = await request(app)
+      .post('/api/auth/admin/signin')
+      .send({ email: TEST_EMAIL, password: 'WrongPassword' });
+    expect(res.status).toBe(401);
+  });
+ 
+  it('rejects malformed input', async () => {
+    const res = await request(app)
+      .post('/api/auth/admin/signin')
+      .send({ email: 'not-an-email', password: 'x' });
+    expect(res.status).toBe(400);
+  });
+});
+Run: npm test
+Definition of Done for Sprint 2
+POST /api/auth/admin/signin returns mfa_setup_required when the admin has no MFA, with an otpauth URL the team can scan.
+POST /api/auth/admin/verify-mfa returns an access token and sets a refresh_token cookie when the code is correct.
+GET /api/auth/me returns the admin profile when called with a valid access token.
+POST /api/auth/refresh issues a new access token using the cookie.
+POST /api/auth/signout deletes the session.
+5 failed signin attempts in 15 minutes return 429 (rate limited).
+Tests pass: signin with valid creds, signin with wrong password, signin with malformed input, verify-mfa with wrong code.
+The team has each been able to log in with their own Google Authenticator scan.
+The pull request is reviewed and merged.
+Sprint 2 demo
+Open Postman, Insomnia, or just curl. Run the full flow live: signin, scan the QR code on the demo phone, verify-mfa, hit /me with the token. Then deliberately enter the wrong code twice and show the error. Show the database row for the admin with mfa_enabled now TRUE. This is the most satisfying demo of the project so far, lean into it.
+Sprint 3: Customer Authentication (Phone, OTP, PIN)
+Sprint goal
+A customer can hit POST /api/auth/customer/request-otp with their phone number. The backend generates a 6 digit code, stores its hash in Redis with a 5 minute expiry, and sends it via Arkesel SMS. The customer then hits POST /api/auth/customer/verify-otp with the code and (on first signup) sets their 4 digit PIN. They receive an access token and refresh token, the same shape as admins.
+Why this sprint matters
+Mobile money customers in Ghana log in by phone, not email. They expect OTPs by SMS. They expect to set a PIN. This is the auth flow for the mobile app, and it follows the same pattern as Sprint 2 with two changes: SMS replaces TOTP, and a PIN replaces a password.
+Who does what
+Person	Responsibility
+Lead	Sets up the SMS adapter and the request-otp endpoint.
+Second	Writes the verify-otp endpoint and PIN setup.
+Third	Signs up for an Arkesel account and gets the API key.
+Fourth	Writes the tests, especially for OTP expiry and rate limiting.
+Task 1: Sign up for Arkesel
+Arkesel (arkesel.com) is a Ghana based SMS provider. Hubtel is the alternative. Pricing is around 5 pesewa per SMS, payable in GHS.
+Steps:
+Go to arkesel.com, click Sign Up, register an account.
+Verify your phone (they will SMS you a code).
+Buy some small credit (10 GHS is plenty for development, hundreds of SMS).
+In the dashboard, get your API key and copy it.
+Put it in your backend/.env file: ARKESEL_API_KEY=your_key_here
+Make sure to never commit this key. You will share it through your team's secure password manager (1Password, Bitwarden, or even a pinned message in a private group chat for now).
+Important: cost control
+Arkesel charges per SMS. In development, do not put your real phone number in random tests. Use a test phone number or print the OTP to console instead of sending. We will add a development mode flag to do exactly that.
+Task 2: Build the SMS adapter
+Create backend/src/services/sms/arkesel.js:
+// backend/src/services/sms/arkesel.js
+// In development (NODE_ENV !== production), prints the SMS to console instead of sending.
+ 
+export async function sendSms(phone, message) {
+  if (process.env.NODE_ENV !== 'production' || !process.env.ARKESEL_API_KEY) {
+    console.log(`\n[DEV SMS] To: ${phone}\n[DEV SMS] Body: ${message}\n`);
+    return { ok: true, dev: true };
+  }
+ 
+  const url = 'https://sms.arkesel.com/api/v2/sms/send';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': process.env.ARKESEL_API_KEY,
+    },
+    body: JSON.stringify({
+      sender: 'FraudShield',
+      message,
+      recipients: [phone],
+    }),
+  });
+ 
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Arkesel send failed: ${response.status} ${body}`);
+  }
+  return response.json();
+}
+Task 3: OTP helpers
+Create backend/src/services/auth/otp.js:
+// backend/src/services/auth/otp.js
+import crypto from 'crypto';
+import bcrypt from 'bcrypt';
+import { redis } from '../../db/redis.js';
+import { sendSms } from '../sms/arkesel.js';
+ 
+const OTP_TTL_SEC = 5 * 60;
+ 
+function key(phone, purpose) {
+  return `otp:${purpose}:${phone}`;
+}
+ 
+export async function generateAndSendOtp(phone, purpose = 'signin') {
+  // Generate a 6 digit numeric code
+  const code = String(crypto.randomInt(100000, 999999));
+  const codeHash = await bcrypt.hash(code, 8);
+ 
+  // Store the hash in Redis with a TTL
+  await redis.set(key(phone, purpose), codeHash, { EX: OTP_TTL_SEC });
+ 
+  await sendSms(phone, `Your FraudShield code is ${code}. It expires in 5 minutes. Never share this code.`);
+  return { sent: true };
+}
+ 
+export async function verifyOtp(phone, purpose, code) {
+  const stored = await redis.get(key(phone, purpose));
+  if (!stored) return false;
+  const ok = await bcrypt.compare(code, stored);
+  if (ok) await redis.del(key(phone, purpose));
+  return ok;
+}
+Task 4: PIN helpers
+Add a small file backend/src/services/auth/pin.js (or extend password.js):
+// backend/src/services/auth/pin.js
+import bcrypt from 'bcrypt';
+ 
+export async function hashPin(pin) {
+  if (!/^\d{4}$/.test(pin)) throw new Error('PIN must be exactly 4 digits');
+  return bcrypt.hash(pin, 12);
+}
+ 
+export async function verifyPin(pin, hash) {
+  if (!pin || !hash) return false;
+  return bcrypt.compare(pin, hash);
+}
+Task 5: The customer auth routes
+Add to backend/src/routes/auth.js (alongside the admin routes):
+// === Customer routes ===
+import { generateAndSendOtp, verifyOtp } from '../services/auth/otp.js';
+import { hashPin, verifyPin } from '../services/auth/pin.js';
+ 
+const requestOtpLimiter = rateLimit({
+  keyPrefix: 'customer_otp',
+  max: 3,                       // max 3 OTPs per phone per 10 min
+  windowSec: 10 * 60,
+  getKey: (req) => (req.body?.phone || '').trim(),
+});
+ 
+const phoneSchema = z.object({ phone: z.string().regex(/^\+233\d{9}$/) });
+const verifyOtpSchema = z.object({
+  phone: z.string().regex(/^\+233\d{9}$/),
+  code: z.string().length(6),
+  pin: z.string().regex(/^\d{4}$/).optional(),
+  fullName: z.string().min(2).optional(),
+});
+ 
+// POST /api/auth/customer/request-otp
+router.post('/customer/request-otp', requestOtpLimiter, async (req, res) => {
+  const parsed = phoneSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Phone must be in +233XXXXXXXXX format' });
+  await generateAndSendOtp(parsed.data.phone, 'signin');
+  res.json({ status: 'ok', message: 'OTP sent' });
+});
+ 
+// POST /api/auth/customer/verify-otp
+router.post('/customer/verify-otp', async (req, res) => {
+  const parsed = verifyOtpSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid input' });
+  const { phone, code, pin, fullName } = parsed.data;
+ 
+  const ok = await verifyOtp(phone, 'signin', code);
+  if (!ok) return res.status(401).json({ error: 'Invalid or expired OTP' });
+ 
+  // Find or create the user
+  let user;
+  const existing = await pool.query('SELECT * FROM users WHERE phone_number = $1', [phone]);
+  if (existing.rows[0]) {
+    user = existing.rows[0];
+    // Existing user: PIN must already be set (or this request is setting it).
+    if (!user.pin_hash && !pin) {
+      return res.status(400).json({ error: 'PIN required for first time setup' });
+    }
+    if (!user.pin_hash && pin) {
+      const pinHash = await hashPin(pin);
+      await pool.query('UPDATE users SET pin_hash = $1 WHERE id = $2', [pinHash, user.id]);
+    }
+  } else {
+    // First time: require PIN and full name
+    if (!pin || !fullName) {
+      return res.status(400).json({ error: 'PIN and full name required for new signup' });
+    }
+    const pinHash = await hashPin(pin);
+    const inserted = await pool.query(
+      `INSERT INTO users (phone_number, pin_hash, full_name) VALUES ($1, $2, $3) RETURNING *`,
+      [phone, pinHash, fullName]
+    );
+    user = inserted.rows[0];
+  }
+ 
+  const accessToken = signAccessToken({
+    sub: user.id, type: 'user', phone: user.phone_number,
+  });
+  const refreshToken = await issueRefreshToken({
+    userId: user.id, ip: req.ip, fingerprint: req.headers['user-agent'] || null,
+  });
+ 
+  res.json({
+    status: 'ok',
+    accessToken,
+    refreshToken,  // mobile stores this in expo-secure-store (no cookies on RN)
+    user: {
+      id: user.id, phone: user.phone_number, fullName: user.full_name,
+      balance: user.balance, trustScore: user.trust_score,
+    },
+  });
+});
+Why mobile gets the refresh token in the body, not a cookie
+Cookies are a browser concept. React Native does not have a cookie jar. So for mobile we send the refresh token in the JSON response body and the mobile app stores it in expo-secure-store, which is the secure storage on iOS (Keychain) and Android (Encrypted SharedPreferences). For the web admin, we keep using httpOnly cookies because they are safer against XSS.
+Task 6: Tests for customer auth
+Add to backend/tests/auth.test.js a new describe block:
+describe('Customer auth', () => {
+  const phone = '+233200999999';
+ 
+  it('rejects invalid phone format', async () => {
+    const res = await request(app)
+      .post('/api/auth/customer/request-otp')
+      .send({ phone: '020-999-9999' });
+    expect(res.status).toBe(400);
+  });
+ 
+  it('accepts a valid Ghana number', async () => {
+    const res = await request(app)
+      .post('/api/auth/customer/request-otp')
+      .send({ phone });
+    expect(res.status).toBe(200);
+    // The dev SMS adapter prints to console, so the OTP is visible there.
+  });
+ 
+  it('rejects wrong OTP', async () => {
+    const res = await request(app)
+      .post('/api/auth/customer/verify-otp')
+      .send({ phone, code: '000000', pin: '1234', fullName: 'Test' });
+    expect(res.status).toBe(401);
+  });
+});
+Definition of Done for Sprint 3
+POST /api/auth/customer/request-otp sends an SMS (or prints to console in dev).
+POST /api/auth/customer/verify-otp creates a new user on first login (with PIN and full name), and returns access + refresh tokens.
+Verify-otp on a returning user (with PIN already set) returns tokens without needing PIN again.
+Rate limiting: max 3 OTP requests per phone per 10 minutes.
+Tests pass.
+At least one team member tests with a real phone number and confirms the SMS arrives.
+Pull request reviewed and merged.
+Sprint 3 demo
+On the call, run the dev backend. In Postman, send a request-otp with one team member's real phone number (they have to opt in). Read the SMS aloud, paste the code into verify-otp, show the access token coming back and the user being created in the database. This is the moment your app stops being a prototype: there are now real users in your database.
+Sprint 4: Transactions, the Rule Based Risk Engine, and Alerts
+Sprint goal
+You can POST a transaction (sender, recipient phone, amount). The backend scores it against rules, writes it to the database, creates an alert if the score is high, and returns the transaction with its score and status. GET /api/transactions returns a paginated list with filters. GET /api/alerts returns alerts. GET /api/risk/analytics returns the data the analytics page needs.
+Why this sprint matters
+This is where the research thesis becomes real. The AI risk scoring is the heart of FraudShield. The PDF review document describes it as "actual AI scoring vs the mock data the app shows now". For your research, transparency matters more than complexity, so we build a rule based scorer first. Each rule is explainable and defensible to your supervisors and to any examiner.
+A note on the word "AI" here: rule based engines are a perfectly valid form of AI when the rules encode expert knowledge. The system "decides" using inputs and produces a categorisation. You can later add a logistic regression or gradient boosted tree as v2, but you do not need it to defend the thesis.
+Who does what
+Person	Responsibility
+Lead	Designs and writes the risk scoring service. This is the most thought heavy task of the sprint.
+Second	Writes the transactions routes and the alert creation logic.
+Third	Writes the alerts routes and the analytics aggregation queries.
+Fourth	Writes the test cases for every scoring rule, plus integration tests for the full transaction flow.
+Task 1: Build the risk scoring service
+Create backend/src/services/risk/scorer.js:
+// backend/src/services/risk/scorer.js
+// A transparent, rule based risk scorer. Each rule contributes a numeric weight.
+// Higher score means more suspicious. The final status comes from thresholds.
+ 
+import { pool } from '../../db/pool.js';
+ 
+const THRESHOLDS = { safe: 30, review: 70 };  // 0-29 safe, 30-69 review, 70+ blocked
+ 
+// Each rule returns { points, reason } if it fires, or null otherwise.
+const RULES = [
+  // Late night transaction (22:00 to 05:00 Africa/Accra)
+  ({ createdAt }) => {
+    const hour = new Date(createdAt).getUTCHours();  // UTC = Accra time
+    if (hour >= 22 || hour < 5) return { points: 25, reason: 'late_night' };
+    return null;
+  },
+ 
+  // Large amount
+  ({ amount }) => {
+    if (amount > 2000) return { points: 20, reason: 'amount_above_2000_ghs' };
+    return null;
+  },
+ 
+  // New recipient (no prior transaction history with this recipient)
+  async ({ senderId, recipientPhone }) => {
+    const prior = await pool.query(
+      'SELECT 1 FROM transactions WHERE sender_id = $1 AND recipient_phone = $2 LIMIT 1',
+      [senderId, recipientPhone]
+    );
+    if (prior.rows.length === 0) return { points: 20, reason: 'new_recipient' };
+    return null;
+  },
+ 
+  // Amount well above the sender's rolling average
+  async ({ senderId, amount }) => {
+    const stats = await pool.query(
+      `SELECT COALESCE(AVG(amount), 0) AS avg_amt
+       FROM transactions
+       WHERE sender_id = $1 AND created_at > NOW() - INTERVAL '30 days'`,
+      [senderId]
+    );
+    const avg = Number(stats.rows[0].avg_amt);
+    if (avg > 0 && amount > avg * 3) return { points: 15, reason: 'amount_3x_avg' };
+    return null;
+  },
+ 
+  // Rapid succession (more than 3 transactions in the last 10 minutes)
+  async ({ senderId }) => {
+    const count = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM transactions
+       WHERE sender_id = $1 AND created_at > NOW() - INTERVAL '10 minutes'`,
+      [senderId]
+    );
+    if (count.rows[0].c > 3) return { points: 15, reason: 'rapid_succession' };
+    return null;
+  },
+ 
+  // Recipient phone flagged in recent alerts
+  async ({ recipientPhone }) => {
+    const flagged = await pool.query(
+      `SELECT 1 FROM alerts a
+       JOIN transactions t ON t.id = a.transaction_id
+       WHERE t.recipient_phone = $1 AND a.created_at > NOW() - INTERVAL '30 days'
+       LIMIT 1`,
+      [recipientPhone]
+    );
+    if (flagged.rows.length > 0) return { points: 50, reason: 'recipient_flagged' };
+    return null;
+  },
+];
+ 
+// Scores a transaction. Returns { score, status, reasons }.
+export async function scoreTransaction(tx) {
+  let total = 0;
+  const reasons = [];
+  for (const rule of RULES) {
+    const result = await rule(tx);
+    if (result) { total += result.points; reasons.push(result.reason); }
+  }
+  total = Math.min(100, total);  // clamp to 0-100
+ 
+  let status;
+  if (total < THRESHOLDS.safe)         status = 'safe';
+  else if (total < THRESHOLDS.review)  status = 'review';
+  else                                 status = 'blocked';
+ 
+  return { score: total, status, reasons };
+}
+Why each rule has a "reason" string
+When the admin opens an alert, they need to know WHY the system flagged the transaction. "Risk score: 75" tells them nothing. "Risk score: 75 because late_night + new_recipient + amount_above_2000_ghs" tells them everything.
+
+This is what makes a rule based engine defensible as a research artifact. Every decision is auditable. With a deep learning model, the answer is "the network said so" and you cannot explain it to a regulator. That is the whole point of choosing rules first.
+Task 2: The transactions routes
+Create backend/src/routes/transactions.js:
+// backend/src/routes/transactions.js
+import { Router } from 'express';
+import { z } from 'zod';
+import crypto from 'crypto';
+import { pool, withTransaction } from '../db/pool.js';
+import { authenticate, requireAdmin } from '../middleware/authenticate.js';
+import { scoreTransaction } from '../services/risk/scorer.js';
+ 
+const router = Router();
+ 
+const createSchema = z.object({
+  recipientPhone: z.string().regex(/^\+233\d{9}$/),
+  amount: z.number().positive().max(50000),
+  category: z.enum(['P2P', 'AGENT', 'MERCHANT']).default('P2P'),
+});
+ 
+// =====================================
+// POST /api/transactions (customer only)
+// =====================================
+router.post('/', authenticate, async (req, res) => {
+  if (req.principal.type !== 'user') return res.status(403).json({ error: 'Customers only' });
+ 
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+  const { recipientPhone, amount, category } = parsed.data;
+ 
+  // Refuse to send to self
+  const sender = (await pool.query('SELECT * FROM users WHERE id = $1', [req.principal.sub])).rows[0];
+  if (!sender) return res.status(404).json({ error: 'Sender not found' });
+  if (sender.phone_number === recipientPhone) return res.status(400).json({ error: 'Cannot send to yourself' });
+  if (Number(sender.balance) < amount) return res.status(400).json({ error: 'Insufficient balance' });
+ 
+  // Score the transaction (before saving, so blocked txs do not move money)
+  const { score, status, reasons } = await scoreTransaction({
+    senderId: sender.id,
+    recipientPhone, amount,
+    createdAt: new Date().toISOString(),
+  });
+ 
+  const reference = 'FS-' + crypto.randomBytes(6).toString('hex').toUpperCase();
+ 
+  // Use a DB transaction so balance and tx record stay consistent
+  const inserted = await withTransaction(async (client) => {
+    const finalStatus = status === 'blocked' ? 'blocked' : (status === 'review' ? 'review' : 'completed');
+ 
+    // Only deduct balance if the tx is not blocked
+    if (finalStatus !== 'blocked') {
+      await client.query(
+        'UPDATE users SET balance = balance - $1 WHERE id = $2',
+        [amount, sender.id]
+      );
+      // If recipient exists in our system, credit them
+      await client.query(
+        'UPDATE users SET balance = balance + $1 WHERE phone_number = $2',
+        [amount, recipientPhone]
+      );
+    }
+ 
+    const recipient = await client.query('SELECT id FROM users WHERE phone_number = $1', [recipientPhone]);
+ 
+    const result = await client.query(
+      `INSERT INTO transactions
+        (reference, sender_id, recipient_phone, recipient_id, amount, category,
+         risk_score, ai_flagged, status, metadata, completed_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING *`,
+      [
+        reference, sender.id, recipientPhone, recipient.rows[0]?.id || null,
+        amount, category, score, score >= 30, finalStatus,
+        JSON.stringify({ reasons }), finalStatus === 'completed' ? new Date() : null,
+      ]
+    );
+    const tx = result.rows[0];
+ 
+    // Create an alert when the tx is held or blocked
+    if (score >= 30) {
+      await client.query(
+        `INSERT INTO alerts (type, title, description, severity, user_id, transaction_id)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          score >= 70 ? 'high_risk' : 'review_required',
+          score >= 70 ? 'Transaction blocked' : 'Transaction needs review',
+          `Reasons: ${reasons.join(', ')}`,
+          score >= 70 ? 'critical' : 'high',
+          sender.id,
+          tx.id,
+        ]
+      );
+    }
+    return tx;
+  });
+ 
+  res.status(201).json({ transaction: inserted, reasons });
+});
+ 
+// ================================================
+// GET /api/transactions (paginated, filterable)
+// ================================================
+router.get('/', authenticate, async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 25, 100);
+  const offset = Number(req.query.offset) || 0;
+  const status = req.query.status;
+  const minRisk = Number(req.query.minRisk) || 0;
+ 
+  // Customers can only see their own. Admins see everything.
+  const where = [];
+  const params = [];
+  if (req.principal.type === 'user') {
+    params.push(req.principal.sub);
+    where.push(`sender_id = $${params.length}`);
+  }
+  if (status) { params.push(status); where.push(`status = $${params.length}`); }
+  if (minRisk) { params.push(minRisk); where.push(`risk_score >= $${params.length}`); }
+ 
+  params.push(limit); params.push(offset);
+  const sql = `SELECT * FROM transactions
+    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    ORDER BY created_at DESC
+    LIMIT $${params.length - 1} OFFSET $${params.length}`;
+ 
+  const result = await pool.query(sql, params);
+  res.json({ transactions: result.rows, limit, offset });
+});
+ 
+// GET /api/transactions/:id
+router.get('/:id', authenticate, async (req, res) => {
+  const result = await pool.query('SELECT * FROM transactions WHERE id = $1', [req.params.id]);
+  const tx = result.rows[0];
+  if (!tx) return res.status(404).json({ error: 'Not found' });
+  if (req.principal.type === 'user' && tx.sender_id !== req.principal.sub) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  res.json(tx);
+});
+ 
+// PUT /api/transactions/:id/status (admin only, e.g. to approve a held tx)
+router.put('/:id/status', authenticate, requireAdmin, async (req, res) => {
+  const allowed = ['completed', 'blocked', 'review'];
+  if (!allowed.includes(req.body?.status)) return res.status(400).json({ error: 'Invalid status' });
+  const result = await pool.query(
+    'UPDATE transactions SET status = $1, completed_at = NOW() WHERE id = $2 RETURNING *',
+    [req.body.status, req.params.id]
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
+  res.json(result.rows[0]);
+});
+ 
+export default router;
+Register the router in src/app.js:
+import transactionsRouter from './routes/transactions.js';
+app.use('/api/transactions', transactionsRouter);
+Task 3: The alerts routes
+Create backend/src/routes/alerts.js:
+// backend/src/routes/alerts.js
+import { Router } from 'express';
+import { pool } from '../db/pool.js';
+import { authenticate, requireAdmin } from '../middleware/authenticate.js';
+ 
+const router = Router();
+ 
+// GET /api/alerts (admins see all, customers see their own)
+router.get('/', authenticate, async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 25, 100);
+  const offset = Number(req.query.offset) || 0;
+  const status = req.query.status; // unread | resolved | all
+ 
+  const where = [];
+  const params = [];
+  if (req.principal.type === 'user') {
+    params.push(req.principal.sub); where.push(`user_id = $${params.length}`);
+  }
+  if (status === 'unread') where.push('read = FALSE');
+  if (status === 'resolved') where.push('resolved = TRUE');
+ 
+  params.push(limit); params.push(offset);
+  const sql = `SELECT * FROM alerts ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+    ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`;
+ 
+  const result = await pool.query(sql, params);
+  res.json({ alerts: result.rows, limit, offset });
+});
+ 
+// PUT /api/alerts/:id/read
+router.put('/:id/read', authenticate, async (req, res) => {
+  await pool.query('UPDATE alerts SET read = TRUE WHERE id = $1', [req.params.id]);
+  res.json({ status: 'ok' });
+});
+ 
+// PUT /api/alerts/:id/resolve (admin only)
+router.put('/:id/resolve', authenticate, requireAdmin, async (req, res) => {
+  const result = await pool.query(
+    `UPDATE alerts SET resolved = TRUE, resolved_at = NOW(), resolved_by = $1
+     WHERE id = $2 RETURNING *`,
+    [req.principal.sub, req.params.id]
+  );
+  res.json(result.rows[0] || null);
+});
+ 
+export default router;
+Register: app.use('/api/alerts', alertsRouter);
+Task 4: The analytics route
+Create backend/src/routes/risk.js:
+// backend/src/routes/risk.js
+import { Router } from 'express';
+import { pool } from '../db/pool.js';
+import { authenticate, requireAdmin } from '../middleware/authenticate.js';
+ 
+const router = Router();
+ 
+// Summary cards on the dashboard
+router.get('/summary', authenticate, requireAdmin, async (req, res) => {
+  const result = await pool.query(`
+    SELECT
+      (SELECT COUNT(*) FROM transactions WHERE created_at > NOW() - INTERVAL '24 hours') AS tx_24h,
+      (SELECT COUNT(*) FROM transactions WHERE status = 'blocked' AND created_at > NOW() - INTERVAL '24 hours') AS blocked_24h,
+      (SELECT COUNT(*) FROM alerts WHERE resolved = FALSE) AS open_alerts,
+      (SELECT AVG(risk_score)::int FROM transactions WHERE created_at > NOW() - INTERVAL '7 days') AS avg_risk_7d
+  `);
+  res.json(result.rows[0]);
+});
+ 
+// Time series data for charts
+router.get('/analytics', authenticate, requireAdmin, async (req, res) => {
+  const byDay = await pool.query(`
+    SELECT date_trunc('day', created_at) AS day,
+           COUNT(*) AS total,
+           SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END) AS blocked,
+           AVG(risk_score)::int AS avg_risk
+    FROM transactions
+    WHERE created_at > NOW() - INTERVAL '30 days'
+    GROUP BY day ORDER BY day
+  `);
+ 
+  const byCategory = await pool.query(`
+    SELECT category, COUNT(*) AS total, AVG(risk_score)::int AS avg_risk
+    FROM transactions GROUP BY category
+  `);
+ 
+  res.json({ byDay: byDay.rows, byCategory: byCategory.rows });
+});
+ 
+export default router;
+Register: app.use('/api/risk', riskRouter);
+Task 5: Tests for the risk scorer
+The scorer is the most important piece of logic in the system. Every rule needs a test.
+Create backend/tests/risk.test.js:
+// backend/tests/risk.test.js
+import { describe, it, expect } from 'vitest';
+import { scoreTransaction } from '../src/services/risk/scorer.js';
+ 
+// Mock the database for unit testing. In a real backend you would use a real test DB.
+describe('scoreTransaction', () => {
+  it('returns 0 for a benign daytime small transaction', async () => {
+    // (You will adapt this to mock the pool or use a real test DB. For brevity:)
+    // const result = await scoreTransaction({ senderId, recipientPhone, amount: 50, createdAt: ... });
+    // expect(result.score).toBe(0);
+    // expect(result.status).toBe('safe');
+    expect(true).toBe(true);  // placeholder
+  });
+});
+A note on test depth
+A proper test suite for the risk engine would mock the database, run every rule in isolation, and confirm the score is exactly the sum of triggered rules. Writing those tests is a sprint of its own. For now, the absolute minimum is that the team manually verifies the scorer by sending sample transactions through the API and confirming the scores match expectations. Take notes and capture screenshots, they will be useful evidence for the dissertation.
+Definition of Done for Sprint 4
+POST /api/transactions creates a transaction, scores it, updates balances (if not blocked), creates an alert if risky.
+GET /api/transactions supports limit, offset, status, and minRisk filters.
+GET /api/transactions/:id works and is access controlled.
+PUT /api/transactions/:id/status works for admins.
+GET /api/alerts paginates and filters correctly.
+GET /api/risk/summary returns the dashboard numbers.
+GET /api/risk/analytics returns the time series data.
+The team has manually tested every rule by sending crafted transactions.
+Pull request reviewed and merged.
+Sprint 4 demo
+Open Postman with three saved requests: signin as the seed user, POST a benign transaction (small amount, daytime) and show score 0, then POST a risky one (large, late night, new recipient) and show score 60+, with the alert appearing in GET /api/alerts. This is genuinely thrilling: your AI fraud engine is making real decisions on real data.
+Sprint 5: Live Feed and the Blockchain Audit Trail
+Sprint goal
+When a customer creates a transaction, the web admin dashboard sees it appear in real time without refreshing. Every transaction, every login, and every admin action also gets written to an append only ledger of SHA-256 hashes that chain back to the previous entry. There is a background job that can verify the chain has not been tampered with. GET /api/blockchain returns the ledger.
+Why this sprint matters
+Real time updates make the dashboard feel alive and demo well. The blockchain audit trail is the third pillar of your research thesis (AI risk + blockchain + MFA) and you need it functioning end to end, not just as a column in the transactions table.
+We are deliberately NOT using a public blockchain like Ethereum. A private append only ledger in PostgreSQL with hash chaining gives you the same security properties (tamper evidence) with none of the gas fees, latency, or research overhead. This is the right choice for the research context.
+Who does what
+Person	Responsibility
+Lead	Implements Server Sent Events for the live feed in Express.
+Second	Builds the blockchain entry writer and integrates it into the transaction creation flow.
+Third	Writes the chain verification job and the blockchain routes.
+Task 1: Server Sent Events for the live transaction feed
+What is SSE: Server Sent Events is the simplest way to push data from server to browser. The browser opens a long lived HTTP connection, and the server sends "events" down it whenever something happens. Compared to WebSockets, it is simpler (one direction only, server to client) and uses regular HTTP, so it works through proxies, firewalls, and Vercel without configuration.
+Create backend/src/services/events/bus.js:
+// backend/src/services/events/bus.js
+// A tiny in process event bus. For multi server production we would use Redis Pub/Sub.
+ 
+import { EventEmitter } from 'events';
+ 
+export const bus = new EventEmitter();
+bus.setMaxListeners(100);
+ 
+// Helper to publish an event with a payload
+export function publish(eventName, payload) {
+  bus.emit(eventName, payload);
+}
+Create backend/src/routes/events.js:
+// backend/src/routes/events.js
+import { Router } from 'express';
+import { bus } from '../services/events/bus.js';
+import { authenticate, requireAdmin } from '../middleware/authenticate.js';
+ 
+const router = Router();
+ 
+// GET /api/events/stream (admin only)
+router.get('/stream', authenticate, requireAdmin, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+ 
+  // Heartbeat every 30 seconds so proxies do not close the connection
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), 30000);
+ 
+  function send(eventName) {
+    return (payload) => {
+      res.write(`event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`);
+    };
+  }
+ 
+  const handlers = {
+    'transaction.new': send('transaction.new'),
+    'transaction.status_changed': send('transaction.status_changed'),
+    'alert.new': send('alert.new'),
+  };
+ 
+  for (const [name, handler] of Object.entries(handlers)) bus.on(name, handler);
+ 
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    for (const [name, handler] of Object.entries(handlers)) bus.off(name, handler);
+  });
+});
+ 
+export default router;
+Register: app.use('/api/events', eventsRouter);
+Then publish events from the transactions route. Update the POST /api/transactions handler so just before res.status(201).json you add:
+import { publish } from '../services/events/bus.js';
+ 
+// ...inside the route, after the transaction is inserted:
+publish('transaction.new', inserted);
+if (score >= 30) publish('alert.new', { transactionId: inserted.id, score, reasons });
+Task 2: The blockchain ledger
+Create backend/src/services/blockchain/ledger.js:
+// backend/src/services/blockchain/ledger.js
+// Append only ledger with SHA-256 hash chaining.
+// Each entry: hash = SHA-256(previousHash + JSON.stringify(payload))
+ 
+import crypto from 'crypto';
+import { pool } from '../../db/pool.js';
+ 
+function hash(previousHash, eventType, payload) {
+  const data = `${previousHash || 'genesis'}|${eventType}|${JSON.stringify(payload)}`;
+  return crypto.createHash('sha256').update(data).digest('hex');
+}
+ 
+// Append a new entry. Returns the new hash.
+export async function appendEntry({ eventType, transactionId = null, payload }) {
+  const last = await pool.query(
+    'SELECT hash FROM blockchain_entries ORDER BY id DESC LIMIT 1'
+  );
+  const previousHash = last.rows[0]?.hash || null;
+  const newHash = hash(previousHash, eventType, payload);
+ 
+  await pool.query(
+    `INSERT INTO blockchain_entries (hash, previous_hash, event_type, transaction_id, payload)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [newHash, previousHash, eventType, transactionId, JSON.stringify(payload)]
+  );
+  return newHash;
+}
+ 
+// Verifies the entire chain. Returns { ok: true } or { ok: false, badAt: id }
+export async function verifyChain() {
+  const result = await pool.query(
+    'SELECT * FROM blockchain_entries ORDER BY id ASC'
+  );
+  let previousHash = null;
+  for (const row of result.rows) {
+    if (row.previous_hash !== previousHash) return { ok: false, badAt: row.id, reason: 'broken_chain' };
+    const expected = hash(previousHash, row.event_type, row.payload);
+    if (row.hash !== expected) return { ok: false, badAt: row.id, reason: 'hash_mismatch' };
+    previousHash = row.hash;
+  }
+  return { ok: true, entries: result.rows.length };
+}
+Wire it into the transaction creation route. After publish(...), add:
+import { appendEntry } from '../services/blockchain/ledger.js';
+ 
+// Append to ledger AFTER the DB commit so we never log a tx that did not happen
+const blockchainHash = await appendEntry({
+  eventType: 'transaction',
+  transactionId: inserted.id,
+  payload: {
+    reference: inserted.reference,
+    senderId: inserted.sender_id,
+    recipientPhone: inserted.recipient_phone,
+    amount: Number(inserted.amount),
+    status: inserted.status,
+    score: inserted.risk_score,
+    createdAt: inserted.created_at,
+  },
+});
+await pool.query('UPDATE transactions SET blockchain_hash = $1 WHERE id = $2',
+  [blockchainHash, inserted.id]);
+Also log admin actions and authentications. In the verify-mfa route, just before returning the access token:
+await appendEntry({
+  eventType: 'auth',
+  payload: { actor: 'admin', adminId: admin.id, action: 'signin_success', at: new Date() },
+});
+Task 3: The blockchain routes
+Create backend/src/routes/blockchain.js:
+// backend/src/routes/blockchain.js
+import { Router } from 'express';
+import { pool } from '../db/pool.js';
+import { authenticate, requireAdmin } from '../middleware/authenticate.js';
+import { verifyChain } from '../services/blockchain/ledger.js';
+ 
+const router = Router();
+ 
+router.get('/', authenticate, requireAdmin, async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const offset = Number(req.query.offset) || 0;
+  const result = await pool.query(
+    'SELECT * FROM blockchain_entries ORDER BY id DESC LIMIT $1 OFFSET $2',
+    [limit, offset]
+  );
+  res.json({ entries: result.rows, limit, offset });
+});
+ 
+router.get('/verify', authenticate, requireAdmin, async (req, res) => {
+  const result = await verifyChain();
+  res.json(result);
+});
+ 
+router.get('/:hash', authenticate, requireAdmin, async (req, res) => {
+  const result = await pool.query('SELECT * FROM blockchain_entries WHERE hash = $1', [req.params.hash]);
+  if (!result.rows[0]) return res.status(404).json({ error: 'Not found' });
+  res.json(result.rows[0]);
+});
+ 
+router.get('/stats/summary', authenticate, requireAdmin, async (req, res) => {
+  const result = await pool.query(`
+    SELECT
+      COUNT(*) AS total_entries,
+      COUNT(*) FILTER (WHERE event_type = 'transaction') AS tx_entries,
+      COUNT(*) FILTER (WHERE event_type = 'auth') AS auth_entries,
+      MAX(created_at) AS last_entry_at
+    FROM blockchain_entries
+  `);
+  res.json(result.rows[0]);
+});
+ 
+export default router;
+Register: app.use('/api/blockchain', blockchainRouter);
+Task 4: A background job to verify the chain
+What you are doing: Every 10 minutes, the backend verifies that the ledger has not been tampered with. If it finds a broken hash, it creates a critical alert.
+Create backend/src/jobs/verifyLedger.js:
+// backend/src/jobs/verifyLedger.js
+import { verifyChain } from '../services/blockchain/ledger.js';
+import { pool } from '../db/pool.js';
+ 
+const INTERVAL_MS = 10 * 60 * 1000;
+ 
+export function startLedgerVerifier() {
+  setInterval(async () => {
+    try {
+      const result = await verifyChain();
+      if (!result.ok) {
+        console.error('BLOCKCHAIN INTEGRITY VIOLATION:', result);
+        await pool.query(
+          `INSERT INTO alerts (type, title, description, severity)
+           VALUES ('integrity_violation', 'Blockchain integrity violation',
+                   $1, 'critical')`,
+          [`Bad entry id ${result.badAt}: ${result.reason}`]
+        );
+      }
+    } catch (err) {
+      console.error('Ledger verify job failed:', err);
+    }
+  }, INTERVAL_MS);
+}
+Start it in src/server.js after the app.listen call:
+import { startLedgerVerifier } from './jobs/verifyLedger.js';
+startLedgerVerifier();
+Task 5: Test the chain integrity
+Manually verify the chain is tamper evident. In Postgres:
+-- Connect to the database
+psql $DATABASE_URL
+ 
+-- Look at the first few entries
+SELECT id, event_type, substring(hash, 1, 12) AS hash_short, substring(previous_hash, 1, 12) AS prev_short
+FROM blockchain_entries ORDER BY id ASC LIMIT 5;
+ 
+-- Now tamper with one (DO THIS ONLY IN DEV)
+UPDATE blockchain_entries SET payload = '{"tampered": true}'::jsonb WHERE id = 2;
+ 
+-- Hit the verify endpoint
+-- curl -H "Authorization: Bearer ..." http://localhost:3000/api/blockchain/verify
+-- Expect: {"ok":false,"badAt":2,"reason":"hash_mismatch"}
+Definition of Done for Sprint 5
+GET /api/events/stream emits Server Sent Events to logged in admins.
+A new transaction triggers a "transaction.new" event that reaches the SSE client.
+Every transaction creates a blockchain entry; the transaction's blockchain_hash column is filled in.
+Every successful admin signin creates a blockchain entry.
+GET /api/blockchain returns the ledger.
+GET /api/blockchain/verify returns {ok:true} on a clean chain.
+Manually tampering with a row makes verify return {ok:false, badAt:N}.
+The background job runs and would create a critical alert if a tamper was detected.
+Pull request reviewed and merged.
+Sprint 5 demo
+Two terminals. In one, curl the SSE endpoint (it will hang open). In another, POST a new transaction. Watch the event appear in the first terminal in real time. Then show the verify endpoint returning ok:true, tamper with a row in psql, hit verify again to show ok:false. This is research gold: live fraud detection plus tamper evident audit.
+Part 3: Connect the Web Admin Dashboard to the Backend
+Your web app is currently a beautiful shell. It looks like the real thing, but every number, every transaction, every alert on screen is hardcoded in the source code. The job of Part 3 is to rip out those fake numbers and replace them with real data coming from the backend you built in Part 2.
+We will do this in three sprints. Sprint 6 builds the plumbing: a single place where every page in the app talks to the backend. Sprint 7 wires up the four most important pages. Sprint 8 finishes the rest. By the end of Part 3, an admin can log in for real, see real transactions stream in live, and resolve real alerts.
+A note on the order
+You cannot test any web page properly until login works, because every protected page needs a token. That is why Sprint 6 must come first and must be solid before anyone moves on. If login is flaky, every other sprint will feel flaky too.
+Sprint 6: API Client, Authentication, and Route Protection
+Sprint goal
+By the end of this sprint, an admin can sign in with their email and password, complete the 2FA check, and land on the dashboard. Any attempt to visit a dashboard URL without being signed in redirects to the sign in page. Every other page in the app uses one shared piece of code to talk to the backend.
+Why this sprint matters
+Right now the SignIn page in your code just calls navigate("/verify") and the TwoFactor page just calls navigate("/dashboard"). There is no real check. Anyone who knows the URL can walk straight into the dashboard. That is fine for a demo video, but it is the very first thing a marker will notice in a security review. We fix it in this sprint.
+We also build a small helper called the API client. Every page that needs to fetch data will go through this one helper. That means when we need to add a new feature, like automatic token refresh or better error handling, we change it in one place instead of in eleven pages.
+Who does what
+Person	Responsibility
+Person A	Builds the API client in src/api/client.js with token in memory plus auto refresh on 401.
+Person B	Builds AuthContext in src/context/AuthContext.jsx and the PrivateRoute component.
+Person C	Wires SignIn.jsx and TwoFactor.jsx to the real backend, using the existing Zod schemas.
+Person D	Wraps App.jsx with ErrorBoundary and PrivateRoute, updates routes.
+Task 1: Create the API client
+What you are doing: writing a small wrapper around the browser's built in fetch function. Every page in the app will use this wrapper instead of calling fetch directly.
+Why: three reasons. First, every request needs the same Authorization header. Writing it eleven times is asking for bugs. Second, when an access token expires (after 15 minutes), the wrapper should automatically refresh it without the user noticing. Third, errors should be typed using your existing classes in src/errors so pages can react properly.
+Steps:
+Create a new folder called src/api and a file inside called client.js.
+Paste in the code below.
+Notice it imports your existing retry, timeout, and circuit breaker utilities from src/utils/async.js. Do not skip this. Your team already built these tools, and the marker has already seen them in your repo, so please use them.
+// src/api/client.js
+import { withTimeout, withRetry, createCircuitBreaker } from '../utils/async'
+import { ApiError, AuthenticationError, NetworkError, RateLimitError } from '../errors'
+ 
+const BASE_URL = import.meta.env.VITE_API_URL
+ 
+// The access token lives in memory only. Never localStorage.
+// If the user refreshes the page they will be signed out and that is fine.
+let accessToken = null
+ 
+export function setAccessToken(token) { accessToken = token }
+export function getAccessToken() { return accessToken }
+export function clearAccessToken() { accessToken = null }
+ 
+async function rawRequest(path, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  }
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+ 
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers,
+    credentials: 'include', // sends the refresh token cookie
+  })
+ 
+  // Read body once. Some endpoints return no JSON.
+  const text = await response.text()
+  const body = text ? JSON.parse(text) : {}
+ 
+  if (response.ok) return body
+ 
+  if (response.status === 429) throw new RateLimitError(body.error || 'Too many requests')
+  if (response.status === 401) throw new AuthenticationError(body.error || 'Unauthorized')
+  if (response.status >= 500) throw new NetworkError(body.error || 'Server error')
+  throw new ApiError(body.error || 'Request failed', response.status)
+}
+ 
+// Try to swap the expired access token for a new one.
+async function tryRefresh() {
+  const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
+    method: 'POST', credentials: 'include',
+  })
+  if (!response.ok) return false
+  const { accessToken: newToken } = await response.json()
+  setAccessToken(newToken)
+  return true
+}
+ 
+const breaker = createCircuitBreaker({ threshold: 5, timeout: 30000 })
+ 
+export async function request(path, options = {}) {
+  const operation = () => withTimeout(
+    withRetry(() => rawRequest(path, options), { retries: 2, delay: 300 }),
+    8000
+  )
+  try {
+    return await breaker.execute(operation)
+  } catch (err) {
+    // One refresh attempt on 401. If the refresh works, retry once.
+    if (err instanceof AuthenticationError) {
+      const refreshed = await tryRefresh()
+      if (refreshed) return await rawRequest(path, options)
+      clearAccessToken()
+    }
+    throw err
+  }
+}
+ 
+// Tiny helpers so pages do not have to spell out the verb each time.
+export const api = {
+  get:    (path)          => request(path, { method: 'GET' }),
+  post:   (path, body)    => request(path, { method: 'POST', body: JSON.stringify(body) }),
+  put:    (path, body)    => request(path, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (path)          => request(path, { method: 'DELETE' }),
+}
+Why we store the token in memory and not localStorage
+If the access token sits in localStorage, any script that runs on the page can read it. A single XSS bug in a dependency would hand the attacker an admin login. Keeping the access token in a JavaScript variable means it disappears the moment the tab closes and is invisible to most XSS payloads.
+The refresh token lives in an httpOnly cookie set by the backend. The browser sends it automatically on the refresh endpoint, but JavaScript on the page cannot read it. This is the safest combination for a small team to operate.
+Task 2: Build AuthContext and PrivateRoute
+What you are doing: creating a React Context that holds the currently signed in admin. Any component anywhere in the app can ask "who is signed in?" by reading this context.
+Why: without a single source of truth for who is signed in, every page will write its own version. With AuthContext, the rule is: if context.admin is null, you are signed out. Done.
+Steps:
+Create src/context/AuthContext.jsx.
+Paste the code below.
+Then create src/components/PrivateRoute.jsx with the second code block.
+// src/context/AuthContext.jsx
+import { createContext, useContext, useEffect, useState } from 'react'
+import { api, setAccessToken, clearAccessToken } from '../api/client'
+ 
+const AuthContext = createContext(null)
+ 
+export function AuthProvider({ children }) {
+  const [admin, setAdmin] = useState(null)
+  const [loading, setLoading] = useState(true)
+ 
+  // On page load, try to refresh. If it works the user stays signed in.
+  useEffect(() => {
+    async function checkSession() {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/refresh`, {
+          method: 'POST', credentials: 'include',
+        })
+        if (response.ok) {
+          const { accessToken } = await response.json()
+          setAccessToken(accessToken)
+          const me = await api.get('/api/auth/me')
+          setAdmin(me.admin)
+        }
+      } catch (_) { /* not signed in, fine */ }
+      setLoading(false)
+    }
+    checkSession()
+  }, [])
+ 
+  async function signIn(email, password) {
+    return await api.post('/api/auth/admin/signin', { email, password })
+  }
+ 
+  async function verifyMfa(sessionToken, mfaCode) {
+    const result = await api.post('/api/auth/admin/verify-mfa', { sessionToken, mfaCode })
+    setAccessToken(result.accessToken)
+    setAdmin(result.admin)
+    return result
+  }
+ 
+  async function signOut() {
+    try { await api.post('/api/auth/signout') } catch (_) {}
+    clearAccessToken()
+    setAdmin(null)
+  }
+ 
+  return (
+    <AuthContext.Provider value={{ admin, loading, signIn, verifyMfa, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+ 
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
+  return ctx
+}
+// src/components/PrivateRoute.jsx
+import { Navigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+ 
+export default function PrivateRoute({ children }) {
+  const { admin, loading } = useAuth()
+  if (loading) return <div className='p-8 text-slate-500'>Checking your session...</div>
+  if (!admin) return <Navigate to='/signin' replace />
+  return children
+}
+Task 3: Wire SignIn and TwoFactor to the real backend
+What you are doing: replacing the navigate calls in SignIn.jsx and TwoFactor.jsx with real API calls. We also plug in your existing Zod schemas so bad input is caught before it ever leaves the browser.
+Steps:
+Open src/pages/SignIn.jsx and find the form submission handler.
+Import useAuth and the SignInSchema you already have in src/schemas.
+Validate input with the schema. On success call signIn(email, password). The backend will return either a session token (meaning go to 2FA) or a setup-required response.
+Repeat for TwoFactor.jsx, using verifyMfa.
+// src/pages/SignIn.jsx: relevant additions
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { SignInSchema } from '../schemas'
+ 
+// inside the component:
+const { signIn } = useAuth()
+const navigate = useNavigate()
+const [serverError, setServerError] = useState(null)
+ 
+async function handleSubmit(event) {
+  event.preventDefault()
+  setServerError(null)
+  const parsed = SignInSchema.safeParse({ email, password })
+  if (!parsed.success) {
+    setServerError('Check your email and password.')
+    return
+  }
+  try {
+    const result = await signIn(email, password)
+    if (result.next === 'mfa_setup_required') {
+      navigate('/verify', { state: { setup: true, qrCode: result.qrCode, sessionToken: result.sessionToken } })
+    } else {
+      navigate('/verify', { state: { sessionToken: result.sessionToken } })
+    }
+  } catch (err) { setServerError(err.message) }
+}
+About the existing tests
+There is already a SignIn.test.jsx file in your repo. After you wire up the real auth call, that test will fail because it expected the old behaviour. Update it: mock useAuth and assert that signIn was called with the right arguments. Do not delete the test.
+Task 4: Update App.jsx with ErrorBoundary, AuthProvider, and PrivateRoute
+What you are doing: wrapping the whole app in an AuthProvider so every page can read the auth state, wrapping it in an ErrorBoundary so a crash on one page does not white-screen the whole app, and putting every /dashboard route behind PrivateRoute.
+// src/App.jsx
+import { Routes, Route } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
+import ErrorBoundary from './components/ErrorBoundary'
+import PrivateRoute from './components/PrivateRoute'
+// (all the existing page imports stay the same)
+ 
+function App() {
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <Routes>
+          <Route path='/' element={<LandingPage />} />
+          <Route path='/signin' element={<SignIn />} />
+          <Route path='/verify' element={<TwoFactor />} />
+          <Route path='/dashboard' element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+          <Route path='/dashboard/risk' element={<PrivateRoute><RiskAnalytics /></PrivateRoute>} />
+          <Route path='/dashboard/alerts' element={<PrivateRoute><AlertsIncidents /></PrivateRoute>} />
+          <Route path='/dashboard/transactions' element={<PrivateRoute><LiveTransactions /></PrivateRoute>} />
+          <Route path='/dashboard/customers' element={<PrivateRoute><CustomerDirectory /></PrivateRoute>} />
+          <Route path='/dashboard/ai-config' element={<PrivateRoute><AIConfiguration /></PrivateRoute>} />
+          <Route path='/dashboard/blockchain' element={<PrivateRoute><BlockchainLedger /></PrivateRoute>} />
+          <Route path='/dashboard/settings' element={<PrivateRoute><SystemSettings /></PrivateRoute>} />
+          <Route path='/dashboard/admins' element={<PrivateRoute><Administrators /></PrivateRoute>} />
+        </Routes>
+      </AuthProvider>
+    </ErrorBoundary>
+  )
+}
+ 
+export default App
+Task 5: Add a .env.local file for the web app
+Your Vite app reads environment variables that start with VITE_. Create a file called .env.local at the root of the web app (same folder as package.json) with this line:
+VITE_API_URL=http://localhost:3000
+Also add .env.local to your .gitignore if it is not there already. This file is per developer and should never be committed.
+Definition of Done for Sprint 6
+Visiting /dashboard while signed out sends you to /signin.
+Signing in with a bad email or password shows a clear error and does not crash.
+Signing in with the correct credentials and a correct TOTP code lands you on the dashboard.
+Refreshing the page on the dashboard keeps you signed in (the refresh cookie does its job).
+Clicking sign out clears everything and sends you back to /signin.
+The browser dev tools Network tab shows the Authorization header on protected requests.
+A new test for the wired SignIn page passes in CI.
+Sprint 6 demo
+On the call, share your screen and do this script: visit /dashboard while signed out, watch it redirect to /signin, sign in with the wrong password and see the error, sign in correctly, complete 2FA, land on the dashboard, refresh the page (stay signed in), then sign out and confirm /dashboard is locked again. About four minutes. This is the most important demo in the whole project, because the marker will check this exact flow first.
+Sprint 7: Wire the Four Most Important Pages
+Sprint goal
+Dashboard, Live Transactions, Risk Analytics, and Alerts and Incidents all show real data from the backend. Live Transactions updates in real time as new transactions come in.
+Why these four first
+These four pages are the heart of the admin experience. If a marker only opens one tab, they will open the dashboard. If they open two, the second will be live transactions. We do these first so that even if Sprint 8 slips, the demo still looks alive and intelligent.
+Who does what
+Person	Responsibility
+Person A	Wires Dashboard.jsx to /api/risk/summary, /api/transactions?limit=4, /api/alerts?limit=3.
+Person B	Wires LiveTransactions.jsx including the EventSource subscription to /api/events/stream.
+Person C	Wires RiskAnalytics.jsx with the existing Recharts components.
+Person D	Wires AlertsIncidents.jsx including the mark-as-read and resolve buttons.
+Task 1: A reusable hook for fetching data
+Before anyone wires a page, one person writes this hook. It saves about fifty lines of code per page.
+// src/hooks/useApi.js
+import { useEffect, useState, useCallback } from 'react'
+import { api } from '../api/client'
+ 
+export function useApi(path, options = {}) {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
+ 
+  const load = useCallback(async () => {
+    setLoading(true); setError(null)
+    try {
+      const result = await api.get(path)
+      setData(result)
+    } catch (err) { setError(err) }
+    finally { setLoading(false) }
+  }, [path])
+ 
+  useEffect(() => { if (!options.skip) load() }, [load, options.skip])
+ 
+  return { data, error, loading, reload: load }
+}
+Task 2: Dashboard
+What you are doing: opening src/pages/Dashboard.jsx and replacing the four hardcoded objects (stats, recent transactions, recent alerts) with calls to useApi.
+// src/pages/Dashboard.jsx: top of the component
+import { useApi } from '../hooks/useApi'
+ 
+export default function Dashboard() {
+  const { data: summary, loading: l1 } = useApi('/api/risk/summary')
+  const { data: txData, loading: l2 } = useApi('/api/transactions?limit=4')
+  const { data: alertData, loading: l3 } = useApi('/api/alerts?limit=3&status=open')
+ 
+  if (l1 || l2 || l3) return <DashboardLayout><Loading /></DashboardLayout>
+ 
+  // summary has { transactionsLast24h, blockedLast24h, openAlerts, averageRisk }
+  // txData has { transactions: [...] }
+  // alertData has { alerts: [...] }
+  // Pass these to your existing JSX in place of the mock objects.
+}
+The Loading and EmptyState components
+You will reuse these on every wired page. Create src/components/Loading.jsx (returns a centred spinner) and src/components/EmptyState.jsx (a friendly message when an array is empty). Even thirty lines each is enough. Doing this once now is much better than each person inventing their own.
+Task 3: Live Transactions with Server Sent Events
+What you are doing: opening a long-lived connection from the browser to /api/events/stream. The backend will push a small JSON message every time a new transaction is created. The page adds it to the top of the list automatically.
+Why Server Sent Events and not Socket.IO: SSE is built into every browser, needs no extra library, and is enough for one-way server-to-client updates, which is exactly what we have. Socket.IO would be overkill for the live feed.
+// src/pages/LiveTransactions.jsx: additions
+import { useEffect, useState } from 'react'
+import { getAccessToken } from '../api/client'
+import { useApi } from '../hooks/useApi'
+ 
+export default function LiveTransactions() {
+  const [filters, setFilters] = useState({ status: 'all', minAmount: '', search: '' })
+  const query = new URLSearchParams(
+    Object.entries(filters).filter(([_, v]) => v && v !== 'all')
+  ).toString()
+  const { data, loading, reload } = useApi(`/api/transactions?${query}`)
+ 
+  const [live, setLive] = useState([])
+ 
+  useEffect(() => {
+    const token = getAccessToken()
+    if (!token) return
+    // EventSource does not allow custom headers, so we pass the token as a query.
+    const source = new EventSource(
+      `${import.meta.env.VITE_API_URL}/api/events/stream?token=${encodeURIComponent(token)}`
+    )
+    source.addEventListener('transaction.new', (event) => {
+      setLive((prev) => [JSON.parse(event.data), ...prev].slice(0, 50))
+    })
+    source.addEventListener('transaction.status_changed', () => reload())
+    return () => source.close()
+  }, [reload])
+ 
+  const allTransactions = [...live, ...(data?.transactions || [])]
+  // render the existing table using allTransactions
+}
+A small backend tweak needed for SSE
+The Bearer token cannot be sent through EventSource headers. So on the backend, the /api/events/stream route should accept the token as a query parameter as a fallback, and your authenticate middleware should check both Authorization header and req.query.token. Add a short comment that this fallback exists only for SSE.
+Task 4: Risk Analytics
+What you are doing: replacing the hardcoded chart data with the response from /api/risk/analytics. The backend already returns a timeSeries array and a byCategory array in the shape Recharts expects.
+// src/pages/RiskAnalytics.jsx: pattern
+import { useApi } from '../hooks/useApi'
+ 
+export default function RiskAnalytics() {
+  const [range, setRange] = useState('7d')
+  const { data, loading } = useApi(`/api/risk/analytics?range=${range}`)
+  if (loading) return <Loading />
+  // data.timeSeries = [{ date, count, blocked, averageScore }, ...]
+  // data.byCategory = [{ category, count }, ...]
+  // Feed these directly into your existing LineChart and PieChart.
+}
+Task 5: Alerts and Incidents
+What you are doing: wiring the list and the two action buttons (mark as read, resolve). Both buttons call api.put and then call reload() to refresh the list.
+// src/pages/AlertsIncidents.jsx: handlers
+import { api } from '../api/client'
+import { useApi } from '../hooks/useApi'
+ 
+const { data, loading, reload } = useApi(`/api/alerts?status=${statusFilter}`)
+ 
+async function markAsRead(alertId) {
+  await api.put(`/api/alerts/${alertId}/read`)
+  await reload()
+}
+ 
+async function resolve(alertId, notes) {
+  await api.put(`/api/alerts/${alertId}/resolve`, { notes })
+  await reload()
+}
+Definition of Done for Sprint 7
+All four pages load real data. No mock arrays anywhere in the four files.
+Open the dashboard in one tab, open the mobile app in another, send a transaction from mobile, watch it appear on Live Transactions within two seconds.
+A bad query (for example minAmount=abc) shows a friendly error, not a blank screen.
+Loading and empty states are visible.
+Existing tests for these pages were updated, not deleted.
+Sprint 7 demo
+Sign in. Show the dashboard with real numbers. Click Live Transactions and let it sit. From your phone, trigger a transaction. Watch it appear at the top of the list in real time. Click Risk Analytics and switch the date range. Click Alerts, mark one as read, resolve another. Five minutes. This is the moment the project feels real.
+Sprint 8: Wire the Remaining Pages
+Sprint goal
+Customer Directory, Blockchain Ledger, AI Configuration, System Settings, and Administrators all show real data and accept real edits. After this sprint, there is not a single line of mock data anywhere in the web app.
+Quick note on backend additions
+Two endpoints in this sprint were not built in Part 2 because they are admin-only and felt non-critical. Build them now, alongside the page wiring:
+GET /api/customers: list customers with pagination, returns { customers, total }.
+GET /api/admins, POST /api/admins, PUT /api/admins/:id, DELETE /api/admins/:id: CRUD for admins, requireRole('super_admin').
+GET /api/ai-config, PUT /api/ai-config/toggles: read and update the active rules in your risk scorer.
+GET /api/settings and PUT /api/settings: system level toggles, key/value pairs stored in a settings table.
+Who does what
+Person	Responsibility
+Person A	Builds the four new backend endpoints above, with tests.
+Person B	Wires CustomerDirectory.jsx and BlockchainLedger.jsx.
+Person C	Wires AIConfiguration.jsx with the toggle PUT endpoint.
+Person D	Wires SystemSettings.jsx and Administrators.jsx.
+Task 1: Customer Directory
+Standard list page. Use useApi with a search query parameter. Debounce the search input by about 300 milliseconds so you do not hammer the backend on every keystroke.
+// debounce search input
+const [search, setSearch] = useState('')
+const [debounced, setDebounced] = useState('')
+useEffect(() => {
+  const timer = setTimeout(() => setDebounced(search), 300)
+  return () => clearTimeout(timer)
+}, [search])
+const { data, loading } = useApi(`/api/customers?search=${encodeURIComponent(debounced)}&page=${page}`)
+Task 2: Blockchain Ledger
+What you are doing: listing entries from /api/blockchain with a search box (search by hash, transaction reference, or event type), and a "Verify chain integrity" button that calls /api/blockchain/verify.
+Make this page look great in the demo
+Show the chain integrity status as a big green check or big red cross at the top of the page. Run /api/blockchain/verify on page load. Add a number that shows total entries. A marker can see at a glance that the audit trail is alive.
+Task 3: AI Configuration
+The backend already has six rules in scorer.js. The config page should show them as a list with on and off toggles. When the admin flips a toggle, the page calls PUT /api/ai-config/toggles with the rule key and the new state. The risk scorer reads the active rules from the database on every transaction.
+To make this work, add a new table to your schema (this is a tiny migration, not a refactor):
+-- backend/src/db/migrations/002_risk_rules.sql
+CREATE TABLE IF NOT EXISTS risk_rules (
+  key VARCHAR(64) PRIMARY KEY,
+  description TEXT NOT NULL,
+  points INT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ 
+INSERT INTO risk_rules (key, description, points) VALUES
+  ('late_night', 'Transaction between 22:00 and 05:00 UTC', 25),
+  ('amount_above_2000_ghs', 'Amount above GHS 2,000', 20),
+  ('new_recipient', 'Sender has never sent to this recipient', 20),
+  ('amount_3x_avg', 'Amount more than three times sender average', 15),
+  ('rapid_succession', 'More than three transactions in ten minutes', 15),
+  ('recipient_flagged', 'Recipient appears in open alerts', 50)
+ON CONFLICT (key) DO NOTHING;
+Then update scorer.js to read enabled rules from the database (cache them in memory for 60 seconds). When an admin disables a rule from the UI, the cache key expires and the new transaction scoring picks up the change.
+Task 4: System Settings
+Settings are key/value pairs. The page is a simple form with read on mount and save on submit. Use Zod to validate types (boolean, number, string) before sending.
+Task 5: Administrators page
+Remove real names and student IDs
+Open src/pages/Administrators.jsx and remove any hardcoded list with real student IDs, real names, or real photos before this page goes live. The security checklist at the end of this guide will check this again. Seed the admins table with placeholder names like "Admin One", "Admin Two", and so on. You can ask the team for whatever display names you want during the demo.
+The page itself is a list, an add button, an edit modal, and a delete confirmation. Standard CRUD. Only a super_admin role can see and use this page. Add a check at the top of the component:
+// src/pages/Administrators.jsx
+import { useAuth } from '../context/AuthContext'
+import { Navigate } from 'react-router-dom'
+ 
+export default function Administrators() {
+  const { admin } = useAuth()
+  if (admin.role !== 'super_admin') return <Navigate to='/dashboard' replace />
+  // ... rest of the page
+}
+Definition of Done for Sprint 8
+Every page in the web app loads real data. There are zero mock arrays.
+Sensitive seed data (real student IDs, real personal photos) is gone.
+AI Configuration toggles flip rules on and off, and a new transaction immediately reflects the change.
+Blockchain Ledger shows chain integrity status clearly.
+Only super_admin can reach the Administrators page.
+CI is green on the develop branch.
+Sprint 8 demo
+Walk the marker through every page in order. Search for a customer. Toggle a risk rule off, send a transaction that would have triggered it, and watch the score change. Verify the blockchain chain. Show that the Administrators page is locked for a regular admin and accessible to a super admin. Twelve minutes. This is the full system on display.
+Part 4: Connect the Mobile App to the Backend
+The mobile app in your /mobile folder is built with Expo. Like the web app, it currently uses hardcoded mock data on every screen. The good news is that the navigation structure (AuthNavigator, MainNavigator, AppNavigator) is already correct. We do not need to rewrite anything. We need to wire it up.
+Mobile has one big difference from web: the user might close the app and come back hours later. We cannot rely on a session cookie. Instead, we save the refresh token in a small encrypted store called expo-secure-store. When the app opens, we try the refresh token. If it works, the user goes straight to the home screen. If not, they sign in again.
+Why we are doing mobile after web
+The two apps share the same backend. If you wire web first and get all the bugs out, mobile becomes mostly copy and adapt. If you tried mobile first, every backend bug would also be a mobile bug, and mobile is harder to debug because you cannot just open the browser dev tools.
+Sprint 9: Mobile Authentication
+Sprint goal
+A customer can install the app on their phone, type a phone number, receive a real OTP by SMS, verify it, set or enter a PIN, and reach the home screen. Refresh tokens are stored securely so the user stays signed in across app restarts. Biometric sign in works on devices that support it.
+Who does what
+Person	Responsibility
+Person A	Builds mobile/src/api/client.js with expo-secure-store for refresh tokens.
+Person B	Builds mobile AuthContext and wires SignInScreen plus OTPScreen.
+Person C	Wires the PIN set and PIN enter flow, plus the BiometricScreen.
+Person D	Updates AppNavigator to switch between Auth and Main based on auth state.
+Task 1: Install the libraries you need
+Open a terminal in the /mobile folder and run:
+cd mobile
+npx expo install expo-secure-store
+npx expo install expo-local-authentication
+# constants for the API URL
+# (no library needed, we just create a file)
+Now create mobile/src/config.js with one constant. This file is NOT in .env because Expo handles env variables differently. A plain JS file is simpler at this scale.
+// mobile/src/config.js
+// During development, use your computer's LAN IP, not localhost.
+// Run "ipconfig" on Windows or "ifconfig" on macOS / Linux to find it.
+export const API_URL = __DEV__
+  ? 'http://192.168.1.50:3000'  // change to YOUR computer\'s IP
+  : 'https://fraudshield-api.up.railway.app'
+Phone cannot reach localhost
+When you run the backend on your laptop and Expo Go on your phone, the phone is a different device on the same WiFi. It cannot see localhost. You must use your laptop's LAN IP address (something like 192.168.1.50). To find it: on Windows open Command Prompt and run ipconfig. On macOS or Linux open Terminal and run ifconfig or ip addr. Look for the IPv4 line on your WiFi interface. Make sure the backend listens on 0.0.0.0, not 127.0.0.1.
+Task 2: Build the mobile API client
+Create mobile/src/api/client.js. The pattern is similar to web but the refresh token is in secure storage instead of an httpOnly cookie.
+// mobile/src/api/client.js
+import * as SecureStore from 'expo-secure-store'
+import { API_URL } from '../config'
+ 
+const REFRESH_KEY = 'fraudshield.refreshToken'
+ 
+let accessToken = null
+ 
+export const tokens = {
+  setAccess: (token) => { accessToken = token },
+  getAccess: () => accessToken,
+  clearAccess: () => { accessToken = null },
+  saveRefresh: (token) => SecureStore.setItemAsync(REFRESH_KEY, token),
+  loadRefresh: () => SecureStore.getItemAsync(REFRESH_KEY),
+  clearRefresh: () => SecureStore.deleteItemAsync(REFRESH_KEY),
+}
+ 
+async function rawRequest(path, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  }
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+ 
+  const response = await fetch(`${API_URL}${path}`, { ...options, headers })
+  const text = await response.text()
+  const body = text ? JSON.parse(text) : {}
+  if (response.ok) return body
+  const err = new Error(body.error || `Request failed (${response.status})`)
+  err.status = response.status
+  throw err
+}
+ 
+async function tryRefresh() {
+  const refresh = await tokens.loadRefresh()
+  if (!refresh) return false
+  try {
+    const response = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: refresh }),
+    })
+    if (!response.ok) {
+      await tokens.clearRefresh()
+      return false
+    }
+    const { accessToken: newAccess, refreshToken: newRefresh } = await response.json()
+    tokens.setAccess(newAccess)
+    if (newRefresh) await tokens.saveRefresh(newRefresh)
+    return true
+  } catch { return false }
+}
+ 
+export async function request(path, options = {}) {
+  try {
+    return await rawRequest(path, options)
+  } catch (err) {
+    if (err.status === 401) {
+      const refreshed = await tryRefresh()
+      if (refreshed) return await rawRequest(path, options)
+    }
+    throw err
+  }
+}
+ 
+export const api = {
+  get:    (path)       => request(path, { method: 'GET' }),
+  post:   (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
+  put:    (path, body) => request(path, { method: 'PUT', body: JSON.stringify(body) }),
+}
+A backend change to match
+On the web side, refresh tokens travel in an httpOnly cookie. On mobile, there is no cookie jar, so the refresh token has to travel in the request body. Your /api/auth/refresh route should accept both: if req.cookies.refresh_token exists, use it; otherwise read req.body.refreshToken. This is already noted in Sprint 3 of Part 2.
+Task 3: Build mobile AuthContext
+// mobile/src/context/AuthContext.js
+import React, { createContext, useContext, useEffect, useState } from 'react'
+import { api, tokens } from '../api/client'
+ 
+const AuthContext = createContext(null)
+ 
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+ 
+  useEffect(() => {
+    async function restore() {
+      const refresh = await tokens.loadRefresh()
+      if (!refresh) return setLoading(false)
+      try {
+        const me = await api.get('/api/auth/me')
+        setUser(me.user)
+      } catch (_) {
+        await tokens.clearRefresh()
+      }
+      setLoading(false)
+    }
+    restore()
+  }, [])
+ 
+  async function requestOtp(phoneNumber) {
+    return await api.post('/api/auth/customer/request-otp', { phoneNumber })
+  }
+ 
+  async function verifyOtp(phoneNumber, code) {
+    const result = await api.post('/api/auth/customer/verify-otp', { phoneNumber, code })
+    tokens.setAccess(result.accessToken)
+    await tokens.saveRefresh(result.refreshToken)
+    setUser(result.user)
+    return result
+  }
+ 
+  async function setPin(pin) {
+    await api.post('/api/auth/customer/set-pin', { pin })
+  }
+ 
+  async function verifyPin(phoneNumber, pin) {
+    const result = await api.post('/api/auth/customer/verify-pin', { phoneNumber, pin })
+    tokens.setAccess(result.accessToken)
+    await tokens.saveRefresh(result.refreshToken)
+    setUser(result.user)
+    return result
+  }
+ 
+  async function signOut() {
+    try { await api.post('/api/auth/signout') } catch (_) {}
+    tokens.clearAccess()
+    await tokens.clearRefresh()
+    setUser(null)
+  }
+ 
+  return (
+    <AuthContext.Provider value={{ user, loading, requestOtp, verifyOtp, setPin, verifyPin, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+ 
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
+  return ctx
+}
+Task 4: Update AppNavigator to switch based on auth
+The current AppNavigator probably just renders the Auth stack first. Update it so it shows a splash screen while loading, then either the Auth stack or the Main stack based on whether user is set.
+// mobile/src/navigation/AppNavigator.js
+import React from 'react'
+import { NavigationContainer } from '@react-navigation/native'
+import { useAuth } from '../context/AuthContext'
+import AuthNavigator from './AuthNavigator'
+import MainNavigator from './MainNavigator'
+import SplashScreen from '../screens/auth/SplashScreen'
+ 
+export default function AppNavigator() {
+  const { user, loading } = useAuth()
+  if (loading) return <SplashScreen />
+  return (
+    <NavigationContainer>
+      {user ? <MainNavigator /> : <AuthNavigator />}
+    </NavigationContainer>
+  )
+}
+And wrap the whole app in AuthProvider in App.js:
+// mobile/App.js
+import { AuthProvider } from './src/context/AuthContext'
+import AppNavigator from './src/navigation/AppNavigator'
+ 
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppNavigator />
+    </AuthProvider>
+  )
+}
+Task 5: Wire SignInScreen and OTPScreen
+SignInScreen.js: replace whatever is in the submit handler with a call to requestOtp, then navigate to the OTP screen with the phone number as a route parameter.
+// mobile/src/screens/auth/SignInScreen.js: handler
+import { useAuth } from '../../context/AuthContext'
+ 
+const { requestOtp } = useAuth()
+const [phoneNumber, setPhoneNumber] = useState('')
+const [submitting, setSubmitting] = useState(false)
+const [error, setError] = useState(null)
+ 
+async function handleContinue() {
+  setError(null); setSubmitting(true)
+  try {
+    await requestOtp(phoneNumber)
+    navigation.navigate('OTP', { phoneNumber })
+  } catch (err) { setError(err.message) }
+  finally { setSubmitting(false) }
+}
+OTPScreen.js: read phoneNumber from route.params, take six digits of input, call verifyOtp. If the user is new (returned in the response), navigate to a SetPin screen. If existing, MainNavigator takes over automatically because user is now set.
+// mobile/src/screens/auth/OTPScreen.js: handler
+const { verifyOtp } = useAuth()
+const { phoneNumber } = route.params
+const [code, setCode] = useState('')
+ 
+async function handleVerify() {
+  try {
+    const result = await verifyOtp(phoneNumber, code)
+    if (result.firstTime) {
+      navigation.navigate('SetPin')
+    }
+    // else MainNavigator renders automatically
+  } catch (err) { setError(err.message) }
+}
+Task 6: PIN screens
+Create two small screens in mobile/src/screens/auth: SetPinScreen.js (new users choose a 4 digit PIN, type it twice for confirmation) and the existing SignInScreen flow could include a "use PIN" option that goes to a PinEntryScreen. PIN entry calls verifyPin. PIN setup calls setPin.
+Show a numeric keypad. Use react-native-keyboard-aware-scroll-view if needed. The simplest possible version is six TextInputs in a row.
+Task 7: Biometric sign in
+What you are doing: on the BiometricScreen, ask the device "is the right person here?" using fingerprint or face. If yes, the screen flips to authenticated and MainNavigator takes over. No biometric data ever leaves the device. The check is purely local.
+// mobile/src/screens/auth/BiometricScreen.js
+import * as LocalAuthentication from 'expo-local-authentication'
+import { useEffect, useState } from 'react'
+ 
+export default function BiometricScreen({ navigation }) {
+  const [available, setAvailable] = useState(false)
+  const [error, setError] = useState(null)
+ 
+  useEffect(() => {
+    (async () => {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync()
+      const enrolled = await LocalAuthentication.isEnrolledAsync()
+      setAvailable(hasHardware && enrolled)
+    })()
+  }, [])
+ 
+  async function tryAuth() {
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Sign in to FraudShield',
+      disableDeviceFallback: false,
+    })
+    if (result.success) {
+      navigation.replace('Main')
+    } else {
+      setError('Biometric check did not succeed.')
+    }
+  }
+ 
+  // render a button or auto-trigger tryAuth on mount
+}
+Biometric does not skip server auth
+A common misunderstanding: biometric authentication does not replace the access token. It is an extra check that the right human is holding the phone. The app still needs a valid refresh token in secure storage. If a customer factory-resets their phone, they will have to do the OTP flow again.
+Definition of Done for Sprint 9
+A new customer can install the app, type a phone number, receive a real SMS OTP (or see it in the backend console in dev mode), enter it, set a PIN, and reach the home screen.
+An existing customer can close and reopen the app and go straight to home without typing anything.
+Biometric is offered on phones that support it and skipped on phones that do not.
+Sign out clears the refresh token from secure storage.
+On the laptop running the backend in dev mode, you can see the OTP printed to the console.
+Sprint 9 demo
+Plug your phone into your laptop. Open the Expo Go app and load the project. Type a phone number, watch the backend console print the OTP, enter it, set a PIN, land on home. Close the app entirely. Reopen. Land straight on home. Sign out. Sign back in with biometric. About six minutes. The marker will check this on their own phone, so make sure your README explains how to point the app at your backend.
+Sprint 10: Mobile Core Features
+Sprint goal
+The Home screen shows the customer's real balance and recent transactions. Send Money posts to the backend and shows the real AI risk score. Transactions screen lists real data. Transaction Detail shows the real blockchain hash from the database.
+Who does what
+Person	Responsibility
+Person A	Wires HomeScreen.js to /api/auth/me and a transactions snippet.
+Person B	Wires SendMoneyScreen.js end to end with the 5-step flow posting to /api/transactions.
+Person C	Wires TransactionsScreen.js and TransactionDetailScreen.js.
+Person D	Leaves FraudScenarioScreen as a client-side simulator and writes a short README note explaining why.
+Task 1: A useApi hook for mobile
+Same idea as web. Drop this file in mobile/src/hooks/useApi.js:
+// mobile/src/hooks/useApi.js
+import { useEffect, useState, useCallback } from 'react'
+import { api } from '../api/client'
+ 
+export function useApi(path) {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
+ 
+  const load = useCallback(async () => {
+    setLoading(true); setError(null)
+    try { setData(await api.get(path)) }
+    catch (err) { setError(err) }
+    finally { setLoading(false) }
+  }, [path])
+ 
+  useEffect(() => { load() }, [load])
+  return { data, error, loading, reload: load }
+}
+Task 2: HomeScreen
+Replace mock balance and mock recent transactions with real data.
+// mobile/src/screens/main/HomeScreen.js: top of component
+import { useApi } from '../../hooks/useApi'
+import { useAuth } from '../../context/AuthContext'
+ 
+export default function HomeScreen() {
+  const { user } = useAuth()
+  const { data, loading, reload } = useApi('/api/transactions?limit=5')
+ 
+  return (
+    <ScrollView refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} />}>
+      <BalanceCard amount={user.balance} />
+      <RecentTransactions transactions={data?.transactions || []} />
+    </ScrollView>
+  )
+}
+Pull to refresh is your friend on mobile
+Users expect to pull down to refresh on every list screen. Wrap your ScrollView or FlatList in RefreshControl and call the reload from useApi. Two extra lines of code that make the app feel native.
+Task 3: Send Money (the headline feature)
+What you are doing: the 5-step flow in your existing SendMoneyScreen is already laid out. We need step 4 (the AI check) to call the backend and step 5 (confirm) to actually post the transaction.
+Why this matters: this is the single screen the marker will most likely test. If the risk score they see on screen comes from a real backend calculation, your project has crossed the line from prototype to working system. If it still says 87 because that number is hardcoded, you have lost half the value of all this work.
+Step 4 (AI Check):
+// mobile/src/screens/main/SendMoneyScreen.js: step 4 handler
+import { api } from '../../api/client'
+ 
+// after the user picks recipient and amount but before confirming:
+async function runRiskCheck(recipientPhone, amount) {
+  setChecking(true)
+  try {
+    // Backend has a preview endpoint that scores without persisting
+    const preview = await api.post('/api/transactions/preview', {
+      recipientPhone, amount, notes,
+    })
+    // preview returns { score, status, reasons }
+    setRiskResult(preview)
+    setStep(5)
+  } catch (err) { setError(err.message) }
+  finally { setChecking(false) }
+}
+A small backend change
+Add a POST /api/transactions/preview route that runs your scorer but does NOT persist to the database or write to the blockchain ledger. It returns the score and the list of triggered reasons. This is the cleanest way to let the mobile app show the AI verdict before the user taps confirm. About fifteen lines of code in your transactions router.
+Step 5 (Confirm):
+// SendMoneyScreen.js: step 5 confirmation
+async function confirmTransfer() {
+  setSubmitting(true)
+  try {
+    const result = await api.post('/api/transactions', {
+      recipientPhone, amount, notes,
+    })
+    // result.transaction.status will be safe, review, or blocked
+    if (result.transaction.status === 'blocked') {
+      navigation.navigate('TransactionDetail', { id: result.transaction.id, blocked: true })
+    } else {
+      navigation.navigate('TransactionDetail', { id: result.transaction.id })
+    }
+  } catch (err) { setError(err.message) }
+  finally { setSubmitting(false) }
+}
+Task 4: TransactionsScreen and TransactionDetailScreen
+// mobile/src/screens/main/TransactionsScreen.js
+const { data, loading, reload } = useApi('/api/transactions?limit=50')
+ 
+<FlatList
+  data={data?.transactions || []}
+  keyExtractor={(item) => item.id}
+  refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} />}
+  renderItem={({ item }) => (
+    <TouchableOpacity onPress={() => navigation.navigate('TransactionDetail', { id: item.id })}>
+      <TransactionRow transaction={item} />
+    </TouchableOpacity>
+  )}
+/>
+TransactionDetailScreen reads the id from route params, fetches /api/transactions/:id, and shows everything including the blockchain_hash field, which is the real SHA-256 your backend computed. Show the hash in a monospace font and a button to copy it to the clipboard. Markers love this kind of polish.
+Task 5: FraudScenarioScreen stays as a simulator
+The four scenarios (SIM swap, phishing, fake reversal, account takeover) are educational walkthroughs, not real attacks. They should stay client-side. Add a small paragraph in your README explaining this is by design: the scenarios show how the system would respond if a real attack happened, using realistic numbers and timing.
+Bonus: hook one scenario to the real API
+For extra polish, pick one scenario (the fake reversal is the most natural) and have it actually trigger a POST /api/transactions in the background, showing the resulting blocked status from the real risk engine. This is a tiny change but it lets you say in the demo: "watch, the platform really did block this." Worth fifteen minutes for a marker's wow moment.
+Definition of Done for Sprint 10
+No mock data anywhere on Home, Send Money, Transactions, or Transaction Detail screens.
+Sending money triggers a real risk score from the backend. Try one safe transfer and one that triggers the late_night rule.
+A blocked transaction shows the reason from the backend (the list of triggered rules).
+Transaction Detail shows the real blockchain hash.
+Pull-to-refresh works on every list.
+Sprint 10 demo
+Send GHS 50 to a recipient. Watch the risk score show "Safe" and the transfer succeed. Open Transaction Detail and show the blockchain hash. Now try to send GHS 5,000 at 2am UTC (you can hack the system clock to test). Watch the backend block it and show the reasons. Tap into the blocked transaction and show the blockchain entry. Ten minutes. This is the project at its most impressive.
+Part 5: Deploy to the Internet and Harden for Launch
+Up until now everything has been running on your laptops. Sprint 11 puts the system on the internet so a marker can open it without you being on the same WiFi. Sprint 12 closes the loose security ends and adds the kind of monitoring real systems need.
+The total monthly cost during demo and marking should be zero. Most platforms used here have free tiers that comfortably cover a research project. If you ever cross the free tier (you will not, at this scale), Railway will email you before charging.
+Sprint 11: Deploy Backend, Web, and Mobile
+Sprint goal
+The backend is live at a public HTTPS URL. The web admin dashboard is live at a public HTTPS URL and points to the backend. The mobile app is built as an Android APK that anyone with the link can install. CORS is locked down. Environment variables are set everywhere.
+Who does what
+Person	Responsibility
+Person A	Deploys the backend to Railway, including Postgres and Redis.
+Person B	Deploys the web app to Vercel and updates its environment variables.
+Person C	Sets up Expo EAS, builds the Android APK, uploads it for sharing.
+Person D	Updates CORS, security headers, and the GitHub Actions workflow.
+Task 1: Deploy the backend to Railway
+Why Railway: it gives you Node.js hosting, Postgres, and Redis from a single dashboard with one-click setup. The Hobby plan at USD 5 per month includes USD 5 of usage credit. With the resource limits and the hard spending cap shown below, a research project like this one comfortably runs at USD 5 to 10 per month total.
+Steps:
+Go to railway.app and sign up with the same GitHub account that owns the FraudShield repo.
+Create a new project. Click "Deploy from GitHub repo" and choose your fraud-shield repository.
+Railway will detect that you have a backend folder. In settings, set the Root Directory to /backend.
+Set the build command to npm install and the start command to npm start. Make sure your backend's package.json has a start script that runs node src/server.js.
+In the same project, click New > Database > PostgreSQL. Railway will spin one up. It exposes a DATABASE_URL variable you can reference.
+Click New > Database > Redis. Same idea. It exposes REDIS_URL.
+Go to your backend service > Variables. Set every variable from the table below. For DATABASE_URL and REDIS_URL, use the special syntax ${{Postgres.DATABASE_URL}} and ${{Redis.REDIS_URL}}. Railway will fill in the actual value at runtime.
+Variable	Value
+DATABASE_URL	${{Postgres.DATABASE_URL}}
+REDIS_URL	${{Redis.REDIS_URL}}
+JWT_SECRET	A long random string. Generate with: openssl rand -base64 48
+JWT_REFRESH_SECRET	A different long random string.
+JWT_EXPIRY	15m
+JWT_REFRESH_EXPIRY	7d
+BCRYPT_ROUNDS	12
+NODE_ENV	production
+PORT	3000
+ARKESEL_API_KEY	Paste from your Arkesel dashboard.
+CORS_ORIGINS	Will be filled in after Vercel deploys (Task 2).
+Click Deploy. Watch the logs. The first deploy might fail because the database is empty. Run your migrations by opening Railway's built in shell on the Postgres service and pasting your schema.sql.
+Generate a public domain in Settings > Networking. You will get something like fraudshield-api-production.up.railway.app. Note this down.
+Test: curl https://YOUR-URL/api/health. You should see your health response showing both database and redis as ok.
+Set a hard spending limit. Open the project Settings > Billing and set the Hard Limit to USD 5. Railway will pause your services if usage crosses that threshold, which protects you from a runaway log or a forgotten background job quietly costing you 30 dollars by month end. This single step matters more than any other on this page.
+Pin resource limits on every service. Without explicit caps, Node will happily take a full gigabyte of RAM. Open each service in turn and set the limits in the table below. These caps are right for research-scale traffic (a few dozen demo transactions per day).
+Service	vCPU cap	RAM cap	Why this is enough
+Backend	0.5	512 MB	Express handles dozens of requests per second comfortably at this size.
+Postgres	0.25	256 MB	Postgres can serve the project schema in under 200 MB of working memory.
+Redis	0.25	256 MB	OTP codes and rate-limit counters fit in under 100 MB. The cap is generous.
+Staying within the Hobby plan
+The Hobby plan price (USD 5 per month) includes USD 5 of usage credit. With the caps above, an always-on backend plus Postgres plus Redis uses roughly USD 8 to 12 of resources per month, which means you pay USD 3 to 7 of overage on top of the plan fee. The hard spending limit will pause your services at the USD 5 ceiling, which keeps your bill predictable.
+If you want to push the bill down further, scale services to zero between demo sessions. In each service's Settings, click Pause when not in active use. Postgres can stay up because idle storage is cheap (storage is not the costly part, compute is). Backend and the Vite preview can sleep happily. Resume them five minutes before a demo.
+For markers who arrive unexpectedly, the safer choice is to leave the backend running and accept the USD 5 to 10 monthly bill. Split four ways, this is well under USD 1 per person per month. Peace of mind is worth that.			
+Generating strong secrets
+Open a terminal and run: openssl rand -base64 48. Copy the output. Do this twice, once for JWT_SECRET and once for JWT_REFRESH_SECRET. These must be different. If you cannot use openssl, in Node: require("crypto").randomBytes(48).toString("base64"). Never reuse a secret across projects or environments.			
+Task 2: Deploy the web app to Vercel
+Why Vercel: it is free for personal use, it understands Vite out of the box, and a deploy takes about 90 seconds.
+Steps:
+Go to vercel.com and sign in with GitHub.
+Click "Add New > Project" and pick your fraud-shield repo.
+Set Root Directory to / (the web app is at the repo root, since your monorepo has the backend in /backend and mobile in /mobile).
+Framework Preset: Vite. Build command: npm run build. Output directory: dist.
+Under Environment Variables add: VITE_API_URL = https://YOUR-RAILWAY-URL
+Click Deploy. You will get a URL like fraud-shield-xyz.vercel.app.
+Now go back to Railway and update the CORS_ORIGINS variable to include your Vercel URL: https://fraud-shield-xyz.vercel.app. Save. Railway redeploys automatically.
+Custom domain
+If your school gives you a subdomain, or if you bought one for the demo, Vercel and Railway both support custom domains in two clicks. Add the domain in Vercel, copy the DNS records they show you, paste them into your domain registrar. Wait fifteen minutes. Done. Free SSL is automatic.
+Task 3: Build the mobile app with EAS
+Why EAS: Expo Application Services is the official build service. It produces a real APK file you can install on any Android phone without going through the Play Store. Free for the build counts you will need.
+Steps:
+In the /mobile folder, run npm install -g eas-cli.
+Run eas login and use your Expo account.
+Run eas build:configure. It creates eas.json.
+Edit eas.json so the preview profile builds an APK rather than an AAB (which only the Play Store can install).
+// mobile/eas.json
+{
+  "cli": { "version": ">= 5.0.0" },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://YOUR-RAILWAY-URL"
+      }
+    },
+    "production": {
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://YOUR-RAILWAY-URL"
+      }
+    }
+  }
+}
+Update mobile/src/config.js to read from process.env.EXPO_PUBLIC_API_URL in production:
+// mobile/src/config.js
+export const API_URL = __DEV__
+  ? 'http://192.168.1.50:3000'
+  : process.env.EXPO_PUBLIC_API_URL
+Run eas build --profile preview --platform android.
+Wait about 12 minutes. EAS will give you a download URL when the build finishes.
+Open that URL on your phone, install the APK, and try to sign in. The app should talk to your live Railway backend.
+iOS build is harder
+iOS builds need an Apple Developer account, which costs USD 99 per year. For a research project, an Android APK is plenty. If a marker only has an iPhone, they can install Expo Go on the App Store and you can share an Expo development link instead. Document this in your README.
+Task 4: Lock down CORS and security headers
+What you are doing: telling the backend to only accept requests from your Vercel domain (and from Expo, which uses exp:// schemes), and adding HTTP security headers that the browser respects.
+// backend/src/app.js: update the cors block
+import cors from 'cors'
+ 
+const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim())
+ 
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile app, curl, server-to-server)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    callback(new Error('Not allowed by CORS'))
+  },
+  credentials: true,
+}))
+Helmet handles most security headers but you should be explicit about the ones the security checklist will ask about:
+import helmet from 'helmet'
+ 
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+    },
+  },
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  frameguard: { action: 'deny' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}))
+Task 5: Extend the GitHub Actions workflow
+Your existing workflow only tests the web app. Add a backend job and a deploy job. Replace .github/workflows/ci.yml with this:
+# .github/workflows/ci.yml
+name: CI
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+ 
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test -- --coverage
+      - run: npm run build
+ 
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: fraudshield_test
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 10s
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: --health-cmd "redis-cli ping" --health-interval 10s
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm', cache-dependency-path: backend/package-lock.json }
+      - working-directory: backend
+        run: npm ci
+      - working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/fraudshield_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: testsecret-do-not-use-in-prod
+          JWT_REFRESH_SECRET: testsecret-refresh
+        run: npm test
+ 
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm', cache-dependency-path: mobile/package-lock.json }
+      - working-directory: mobile
+        run: npm ci
+      - working-directory: mobile
+        run: npm test --if-present
+Automatic deploys
+Railway and Vercel both watch your GitHub repo by default. Every push to main triggers an auto-deploy. You can also set up a "develop" environment that auto-deploys from the develop branch. That gives you a staging URL to test before promoting to production. Recommended.
+Definition of Done for Sprint 11
+Backend is live at a public HTTPS URL. The health endpoint returns ok for both database and redis.
+Web app is live on Vercel. You can sign in, complete 2FA, and see real data.
+A teammate on another network can install the APK and sign in.
+CORS_ORIGINS is set to exactly your Vercel URL. Try opening the web app from a different domain and confirm it is rejected.
+GitHub Actions runs all three jobs (web, backend, mobile) on every push and pull request.
+Sprint 11 demo
+Turn off your laptop's WiFi. Connect to mobile data. Open the Vercel URL on your phone's browser. Sign in. Show the dashboard. Switch to the installed APK. Sign in there too. Both are talking to the same live backend. This is the moment your project moves from "thing on a laptop" to "actual service." About four minutes.
+Sprint 12: Hardening, Tests, Monitoring, Security Audit
+Sprint goal
+Test coverage is meaningful across pages, not just utilities. Errors are reported to Sentry. Logs flow to Logtail. Uptime is monitored. Every endpoint has been audited for auth and rate limiting. The project is ready for marking.
+Who does what
+Person	Responsibility
+Person A	Expands test coverage on web pages and backend endpoints.
+Person B	Sets up Sentry, Logtail, and UptimeRobot.
+Person C	Runs the security audit checklist and fixes findings.
+Person D	Writes the final README, runbook, and produces the demo recording.
+Task 1: Expand test coverage
+Your utils have 96% coverage. The pages have almost none. Pick the four most important pages first: SignIn, TwoFactor, Dashboard, LiveTransactions. For each, write a test that:
+Renders the page with a mocked API client.
+Asserts the loading state appears.
+Resolves the API mock and asserts the data renders correctly.
+Asserts the error state when the API rejects.
+Example pattern using Vitest and React Testing Library:
+// src/pages/Dashboard.test.jsx
+import { render, screen, waitFor } from '@testing-library/react'
+import { vi } from 'vitest'
+import Dashboard from './Dashboard'
+ 
+vi.mock('../api/client', () => ({
+  api: {
+    get: vi.fn().mockResolvedValue({
+      transactionsLast24h: 142, blockedLast24h: 7, openAlerts: 3, averageRisk: 32,
+    }),
+  },
+}))
+ 
+test('renders summary numbers when API resolves', async () => {
+  render(<Dashboard />, { wrapper: TestWrappers })
+  await waitFor(() => {
+    expect(screen.getByText('142')).toBeInTheDocument()
+  })
+})
+For the backend, add supertest tests for every endpoint group. At minimum verify: a happy path, a missing-auth case (returns 401), a wrong-role case (returns 403), a bad-input case (returns 400 with a Zod error). About six tests per endpoint group.
+Task 2: Sentry for error tracking
+Sentry catches errors that happen in production where you cannot see them. The free tier gives you 5,000 errors per month, way more than you will ever hit.
+Steps:
+Sign up at sentry.io. Create one project for the web app (React) and one for the backend (Node).
+Web: npm install @sentry/react. Initialise in src/main.jsx:
+// src/main.jsx
+import * as Sentry from '@sentry/react'
+ 
+Sentry.init({
+  dsn: import.meta.env.VITE_SENTRY_DSN,
+  environment: import.meta.env.MODE,
+  tracesSampleRate: 0.1,
+})
+Update your ErrorBoundary to forward caught errors to Sentry:
+// src/components/ErrorBoundary.jsx: inside componentDidCatch
+import * as Sentry from '@sentry/react'
+ 
+componentDidCatch(error, info) {
+  this.props.logger?.error('ErrorBoundary caught', { error, info })
+  Sentry.captureException(error, { contexts: { react: info } })
+}
+Backend: npm install @sentry/node. In src/app.js add:
+// backend/src/app.js
+import * as Sentry from '@sentry/node'
+ 
+if (process.env.SENTRY_DSN) {
+  Sentry.init({ dsn: process.env.SENTRY_DSN, environment: process.env.NODE_ENV })
+  app.use(Sentry.Handlers.requestHandler())
+  // ... your routes
+  app.use(Sentry.Handlers.errorHandler())
+}
+Add VITE_SENTRY_DSN to Vercel and SENTRY_DSN to Railway. Use the DSN from each Sentry project.
+Task 3: Logtail for log aggregation
+Your backend already prints structured JSON logs. Logtail (free tier 1 GB / month) ingests them and gives you a searchable web UI. Three steps:
+Sign up at logtail.com. Create a source. Pick "HTTP".
+Logtail gives you an ingestion token. Add it to Railway as LOGTAIL_TOKEN.
+Update backend/src/utils/logger.js to also POST every log to Logtail in production:
+// backend/src/utils/logger.js: extend
+function ship(record) {
+  if (process.env.NODE_ENV !== 'production') return
+  if (!process.env.LOGTAIL_TOKEN) return
+  fetch('https://in.logtail.com', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.LOGTAIL_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(record),
+  }).catch(() => {}) // never let logging crash the app
+}
+Task 4: UptimeRobot
+Free service that pings your health endpoint every 5 minutes. If it stops responding, you get an email or a Slack message.
+Sign up at uptimerobot.com (free tier is generous).
+Add a monitor: type HTTP(s), URL https://YOUR-RAILWAY-URL/api/health, interval 5 minutes.
+Add your group email as the alert contact.
+Take a screenshot of the green status for your final report.
+Task 5: The full security audit
+Go through this list as a team. Each item gets a tick. If anything is not ticked, fix it before claiming "done".
+Authentication and authorization
+Every endpoint that should require auth uses the authenticate middleware. Walk through routes/*.js file by file and confirm.
+Every endpoint that should be admin-only uses requireAdmin or requireRole.
+No endpoint trusts a user_id from the request body. The id always comes from the verified JWT.
+The /api/admins routes require role super_admin. A regular admin cannot list other admins.
+The Administrators page (web) is locked to super_admin at both the route and the API level.
+Passwords, tokens, and secrets
+All passwords are hashed with bcrypt cost 12.
+All PINs are hashed with bcrypt cost 12.
+TOTP secrets are stored hashed (or at minimum encrypted at rest if you use pgcrypto).
+JWT_SECRET and JWT_REFRESH_SECRET are different, each at least 32 bytes of randomness.
+Access tokens live in memory only on the web app. Confirmed by looking at the source: no setItem calls referencing the token.
+Refresh tokens on the web are in httpOnly, Secure, SameSite=Strict cookies. Inspect with browser dev tools > Application > Cookies and confirm all three flags.
+Refresh tokens on mobile are in expo-secure-store.
+No secret has ever been committed to the repository. Run: git log -p | grep -i secret. If anything appears, rotate the secret.
+Rate limiting and lockout
+Five failed sign in attempts in 15 minutes triggers a 429.
+Ten failed sign in attempts in an hour temporarily suspends the account.
+Each rate limiter has been tested with curl: hit the same endpoint six times fast and confirm 429.
+Input validation
+Every POST and PUT endpoint validates with a Zod schema before touching the database.
+Phone numbers are normalised (strip spaces, ensure leading +233 for Ghana).
+Amount fields cap at a reasonable upper bound (no transactions of GHS 9 billion).
+Database
+All SQL uses parameterised queries. No string concatenation in queries anywhere.
+PostgreSQL row level security is enabled on the users and transactions tables. A user can only SELECT rows where the id matches the session user.
+The database password is not the same as JWT secrets.
+Frontend hygiene
+Run npm audit. Run npx snyk test. Fix anything HIGH or CRITICAL.
+Production builds do not include source maps with secrets. Confirm in the build output.
+Remove the real student IDs and personal photos from Administrators.jsx seed data. Use placeholder names like "Demo Admin One".
+Blockchain integrity
+The verifyChain job runs every 10 minutes and creates a critical alert on tamper detection.
+Manually test it: open a database tool, change one byte in a blockchain_entries row, wait for the job, confirm the alert.
+Document the audit
+Take this checklist and tick each box in a markdown file at docs/SECURITY_AUDIT.md. For each item, write one sentence about how you confirmed it (for example "checked with curl on 2026-06-01, returned 429 on the 6th attempt"). Markers love evidence.
+Task 6: Final README and runbook
+Update README.md at the root of the repo to include:
+A one-paragraph project description with the team members and the institution.
+Links to the live web app, the live backend health endpoint, the APK download.
+How to run the system locally (clone, npm install in three folders, docker compose up, npm run dev in each).
+How to sign in as the demo admin (email and password, then how to scan the TOTP QR with Google Authenticator).
+How to sign in as the demo customer (a known seeded phone number, OTP visible in the backend logs).
+A link to docs/SECURITY_AUDIT.md and docs/ARCHITECTURE.md.
+A screenshot of UptimeRobot showing the system has been up.
+If you pause services between sessions to stay within the Railway Hobby plan, document the demo windows clearly (for example "live Monday to Friday 9am to 6pm Accra time, and on request"). Markers who arrive outside the window will see service unavailable, so set their expectations up front.
+Also create docs/RUNBOOK.md with the most common operational tasks: how to look at production logs, how to roll back a deploy, how to rotate JWT_SECRET, how to take a database backup. Even three lines per task is fine. A runbook is what separates a research project from a production system in a marker's eyes.
+Task 7: Record the demo
+A four-minute video that shows everything working is worth more than a thousand-word write up. Do this as a team on the last day:
+Open the web app at the live URL. Sign in. Show 2FA. Land on the dashboard.
+Pick up the phone with the APK installed. Sign in. Send GHS 50. Show "Safe" verdict.
+Switch back to the laptop. Show the transaction appearing live in the Live Transactions feed.
+Send GHS 5,000 at a configured "late night" time. Show "Blocked". Show the reason list.
+Open Blockchain Ledger on the web. Show the entry for the blocked transaction.
+Open AI Configuration. Toggle one rule off. Try the same transaction. Show the new (lower) score.
+Open Alerts. Resolve one. Show it leaves the open list.
+Open Sentry and Logtail dashboards. Show real production traffic.
+End on UptimeRobot showing green status.
+Tools for screen recording
+On macOS press Cmd+Shift+5. On Windows press Win+G for Game Bar. For phone screen plus narration, use the phone's built in screen recorder and OBS Studio to combine both feeds. Free tools, no plugins, twenty minutes from idea to a polished mp4.
+Definition of Done for Sprint 12
+Test coverage is meaningful on the four most important pages and on every backend endpoint group.
+Sentry, Logtail, and UptimeRobot are live in production.
+Every item on the security audit checklist has been ticked or fixed.
+docs/SECURITY_AUDIT.md, docs/ARCHITECTURE.md, docs/RUNBOOK.md are all in the repo.
+The README at the root of the repo is up to date, with live links.
+The demo video is recorded, less than five minutes, and linked in the README.
+Sprint 12 demo
+There is no separate demo for this sprint. The demo video you produce in Task 7 is the demo. Watch it together as a team. If anything looks awkward, fix it and re-record. Then ship.
+You Built It
+Five months ago this was a prototype with hardcoded data. Today it is a real system. A real customer can sign in by phone. A real fraud analyst can sign in with email, password, and a 6-digit code from their authenticator app. A real transaction triggers a real AI score from a real backend. A real blockchain entry, with a real SHA-256 hash, lands in a real database. A real alert appears on a real dashboard, in real time.
+You did this by splitting the work across thirteen small sprints and trusting that each one would compound. That is the entire trick of shipping software. Not one heroic push, but thirteen small, demonstrable, "did it!" moments stacked end to end.
+Now go demo it.
+Appendix A: Glossary
+Terms used throughout this guide, explained in plain English.
+Term	What it means
+API	Application Programming Interface. The set of URLs your backend exposes so the web app and mobile app can ask it questions and tell it to do things.
+bcrypt	A way of scrambling passwords so that even if someone steals the database, they cannot read the original passwords. Slow on purpose, which makes brute-force guessing very expensive.
+Branch	A separate line of work in Git. Lets you build a feature without disturbing the main version of the code until you are ready to merge.
+CI	Continuous Integration. The automated checks (lint, tests, build) that run every time someone pushes code or opens a pull request.
+CORS	Cross-Origin Resource Sharing. The browser rule that stops one website from making requests to another website unless that other website explicitly permits it. We tell our backend which domains are allowed.
+Docker	A tool that runs services like Postgres and Redis inside small isolated boxes called containers. Means your laptop does not need Postgres installed natively.
+Endpoint	A single URL on your backend that does one thing. For example POST /api/transactions creates a transaction.
+Environment variable	A piece of configuration set outside the code (in .env or in the hosting dashboard) so the same code behaves differently in development and production.
+Hash	A one-way scrambling of data. The same input always produces the same hash, but you cannot turn a hash back into the input. Used for passwords (bcrypt) and for the blockchain (SHA-256).
+JWT	JSON Web Token. A short string the backend gives you after sign in. You include it on every future request to prove you are signed in. Has a built-in expiry time.
+Migration	A SQL file that changes the database schema. Stored in source control so the same change runs on every developer's database and in production.
+MFA	Multi-Factor Authentication. Requiring more than just a password to sign in. Typically password plus a 6-digit code from an app.
+Monorepo	A single Git repository that contains more than one project. Yours holds the web app at the root, the mobile app in /mobile, and the backend in /backend.
+npm	Node Package Manager. The tool that installs JavaScript libraries listed in package.json.
+OTP	One Time Password. A 6-digit code that works once and then expires. We send these by SMS for customer sign in.
+Pull request	A request on GitHub to merge a branch into another branch. Lets teammates review the code and CI run tests before the change goes in.
+Rate limiting	Capping how many times an IP or user can hit an endpoint in a window of time. Stops brute-force attacks.
+Redis	A super fast in-memory key-value store. We use it for OTP codes (with auto expiry), rate-limit counters, and session tracking.
+REST	A style of organising URLs where each URL is a noun (resource) and each HTTP verb (GET, POST, PUT, DELETE) is an action on that noun.
+Schema	Either the shape of the database (which tables and columns exist) or the shape of an API request (which fields and types). Zod handles the second kind for us.
+Sprint	A short, focused chunk of work, usually one to two weeks. Each sprint in this guide produces something demonstrable.
+SSE	Server-Sent Events. A way for the backend to push updates to the browser over a long-lived HTTP connection. Used for the live transaction feed.
+TOTP	Time-based One-Time Password. The 6-digit codes that Google Authenticator generates and that change every 30 seconds.
+Token	A general word for a string that proves you are who you say you are. JWTs are tokens. Refresh tokens are tokens. OTPs are tokens.
+Zod	A JavaScript library for validating that data matches a schema. Used on both frontend (before sending) and backend (after receiving).
+Appendix B: Command Cheat Sheet
+Commands you will use again and again. Print this page if you like.
+Git basics
+# Set your name and email (one time only)
+git config --global user.name "Your Full Name"
+git config --global user.email "you@example.com"
+ 
+# Clone the repository to your laptop
+git clone https://github.com/YOUR-TEAM/fraud-shield.git
+cd fraud-shield
+ 
+# See which branch you are on
+git status
+ 
+# Get the latest changes
+git pull
+ 
+# Start a new feature branch
+git checkout -b feature/sprint-7-dashboard
+ 
+# See what you changed
+git diff
+ 
+# Stage and commit
+git add .
+git commit -m "wire dashboard to risk summary endpoint"
+ 
+# Push to GitHub for the first time
+git push -u origin feature/sprint-7-dashboard
+ 
+# Push again later
+git push
+ 
+# Switch back to develop and pull the latest
+git checkout develop
+git pull
+ 
+# Bring the latest develop into your branch
+git checkout feature/sprint-7-dashboard
+git rebase develop
+Node and npm
+# Check your versions
+node --version    # should be 20.x or higher
+npm --version     # should be 10.x or higher
+ 
+# Install all the libraries listed in package.json
+npm install
+ 
+# Add a new library and save it
+npm install some-library
+ 
+# Run a script defined in package.json
+npm run dev
+npm run build
+npm test
+ 
+# Audit installed libraries for known security issues
+npm audit
+npm audit fix
+Docker for local Postgres and Redis
+# Start the services described in docker-compose.yml
+docker compose up -d
+ 
+# See what is running
+docker compose ps
+ 
+# Look at the Postgres logs
+docker compose logs postgres
+ 
+# Stop and remove everything (data is preserved)
+docker compose down
+ 
+# Stop AND wipe the database
+docker compose down -v
+ 
+# Open a psql shell inside the Postgres container
+docker compose exec postgres psql -U fraudshield -d fraudshield_dev
+Useful psql commands
+\dt              -- list all tables
+\d users         -- show structure of the users table
+SELECT * FROM transactions ORDER BY created_at DESC LIMIT 5;
+\q               -- quit
+Expo and EAS for mobile
+cd mobile
+ 
+# Run the app locally with your phone
+npx expo start
+ 
+# Clear the cache if things are weird
+npx expo start -c
+ 
+# Build an APK
+eas build --profile preview --platform android
+ 
+# See the status of your builds
+eas build:list
+Appendix C: Troubleshooting
+The errors you are most likely to hit, and how to get unstuck. If your problem is not here, paste the error message into the team Slack or WhatsApp before searching online. A teammate has probably seen it.
+"Cannot find module"
+You ran into this because the library is not installed. Run npm install in the folder where the error appeared. If you switched branches, install again because the new branch might have new dependencies.
+"Port 3000 already in use"
+Another program is using the port. Either close that program or change the port. On macOS or Linux find what is using it: lsof -i :3000. On Windows: netstat -ano | findstr :3000. Then kill that process or pick a different port in your .env file.
+"CORS error" in the browser console
+The backend rejected your request because the web app's origin is not in CORS_ORIGINS. Check the value of CORS_ORIGINS in your backend .env (locally) or in Railway (in production). It should match exactly: scheme, host, port. http://localhost:5173 is not the same as http://localhost:3000.
+"ECONNREFUSED 127.0.0.1:5432"
+Your backend cannot reach Postgres. Did you run docker compose up? Is the postgres container running (docker compose ps)? Is DATABASE_URL in your .env pointing to the right host and port?
+Mobile app cannot reach the backend
+The phone is on WiFi but cannot find your laptop. Three usual causes: (1) The phone is on a different network. Connect both to the same WiFi. (2) Your laptop's firewall is blocking port 3000. Allow incoming on that port. (3) You used localhost in mobile/src/config.js. The phone has its own localhost. Use the laptop's LAN IP.
+"Invalid token" on every request after sign in
+Either the JWT_SECRET on the backend does not match what signed the token (did you redeploy with a new secret?) or the clock on your laptop is wrong (TOTP and JWT both care about time). Run an NTP sync.
+"docker compose: command not found"
+You have an old version of Docker. The new syntax is docker compose (two words). The old syntax was docker-compose (with a hyphen). On older systems, install docker-compose-plugin from your package manager or upgrade Docker Desktop.
+Test that worked locally fails in CI
+Three suspects: (1) The test depends on the system clock or timezone. Use a fixed date with vi.setSystemTime in Vitest. (2) The test depends on a file that is not committed. Check git status. (3) The test depends on an environment variable that exists locally but not in CI. Add it to the workflow file or use a default in the test.
+"Permission denied (publickey)" when pushing to GitHub
+Your SSH key is not set up. Easiest fix: switch to HTTPS auth. git remote set-url origin https://github.com/YOUR-TEAM/fraud-shield.git. Then push again. GitHub will prompt you to sign in with a personal access token, which you create at github.com/settings/tokens.
+Merge conflict during a pull request
+Two people changed the same lines. Open the conflicting files in your editor. You will see <<<<<<< and >>>>>>> markers showing both versions. Pick the right one, delete the markers, save. Then git add the file and git commit. Push again. If the conflict is in something you do not understand (like a lock file), do not guess: ask the other person to walk through it with you.
+Expo build fails on EAS
+Click into the failed build and read the logs. Common causes: (1) A native dependency that does not work on EAS Cloud. (2) An environment variable that is missing from eas.json. (3) An incompatible package version. If the logs are not helpful, search the exact error on the Expo forums.
+When you are truly stuck
+Set a 25 minute timer. If you still cannot move after 25 minutes, post in the team chat with: (a) what you were trying to do, (b) what command you ran, (c) the exact error message, (d) what you have already tried. Asking well is a skill. Asking well in writing is a much bigger skill than knowing the answer.
+Appendix D: Resources for Further Learning
+Things to read or watch when this project is done and you want to go deeper. All free.
+Backend
+expressjs.com/en/guide/routing.html: the official Express routing guide. Short and clear.
+node-postgres.com: the docs for the pg library you are using. The transactions section is gold.
+redis.io/docs/data-types/: Redis data types in plain English.
+owasp.org/www-project-top-ten/: the ten most common web security mistakes. Every developer should know them.
+React and the web app
+react.dev/learn: the official React tutorial. The new version (2024) is unusually well written.
+tkdodo.eu/blog/practical-react-query: even if you stick with useApi hooks, this teaches the patterns that React Query implements.
+testing-library.com/docs/react-testing-library/intro: best practices for writing tests that test behaviour, not implementation.
+React Native and mobile
+docs.expo.dev: the Expo documentation. Especially the EAS Build section.
+reactnative.dev/docs/getting-started: the React Native core docs.
+Database
+use-the-index-luke.com: a free book on how database indexes work. Short, surprisingly fun.
+postgresqltutorial.com: well-organised Postgres tutorials covering every feature.
+Git and team collaboration
+learngitbranching.js.org: an interactive visualization of every Git command.
+chris.beams.io/posts/git-commit/: how to write a good commit message.
+System design and architecture
+martinfowler.com: articles on software architecture. Start with the "REST" and "CI" entries.
+aws.amazon.com/builders-library: long form essays on how Amazon builds reliable systems.
+Career
+boot.dev: the platform Mina is using. Backend focused, project based, with built-in tutoring.
+the-architect-of-data.com: a free PDF on common patterns in fintech data architecture.
+One last thought
+You learned more building this than you would have learned reading any of the above. Resources are good for filling specific gaps. Building real things is what makes you a real engineer. Keep building.
+

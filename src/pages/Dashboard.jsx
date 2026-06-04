@@ -1,35 +1,49 @@
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCircle, AlertTriangle, TrendingUp, Brain, Fingerprint, Link2, MapPin, Clock, ShieldCheck } from 'lucide-react'
+import { Bell, CheckCircle, AlertTriangle, AlertCircle, TrendingUp, Brain, Fingerprint, Link2, Clock, ShieldCheck } from 'lucide-react'
 import DashboardLayout from '../components/DashboardLayout'
+import Loading from '../components/Loading'
+import EmptyState from '../components/EmptyState'
+import { useAuth } from '../context/AuthContext'
+import { useApi } from '../hooks/useApi'
 
-const alerts = [
-  { id: 1, title: 'Unusual Login Location', desc: 'Login attempt from Dubai, UAE', time: '2 min ago', icon: AlertTriangle, bg: '#fffbeb', border: '#fde68a', iconBg: '#f59e0b', titleColor: '#d97706' },
-  { id: 2, title: 'Transaction Verified', desc: 'Payment to Melcom Ghana cleared', time: '15 min ago', icon: CheckCircle, bg: '#f0fdf4', border: '#bbf7d0', iconBg: '#22c55e', titleColor: '#16a34a' },
-  { id: 3, title: 'Security Score Updated', desc: 'Your trust score increased to 98.5%', time: '1 hour ago', icon: TrendingUp, bg: '#eff6ff', border: '#bfdbfe', iconBg: '#3b82f6', titleColor: '#2563eb', italic: true },
-]
+// ─── helpers ────────────────────────────────────────────────────────────────
 
-const liveTransactions = [
-  { id: 'TXN-001', time: '14:23:45', location: 'Accra, Ghana', amount: '₵1,250.00', risk: 'Low', riskColor: '#22c55e', status: 'Safe', statusColor: '#16a34a', dotColor: '#22c55e' },
-  { id: 'TXN-002', time: '14:23:42', location: 'Kumasi, Ghana', amount: '₵850.50', risk: 'Low', riskColor: '#22c55e', status: 'Safe', statusColor: '#16a34a', dotColor: '#22c55e' },
-  { id: 'TXN-003', time: '14:23:38', location: 'London, UK', amount: '₵3,500.00', risk: 'Medium', riskColor: '#f59e0b', status: 'Review', statusColor: '#d97706', dotColor: '#f59e0b' },
-  { id: 'TXN-004', time: '14:23:35', location: 'Takoradi, Ghana', amount: '₵450.00', risk: 'Low', riskColor: '#22c55e', status: 'Safe', statusColor: '#16a34a', dotColor: '#22c55e' },
-]
+function fmtAmount(n) {
+  return '₵' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
+}
 
-const recentTxns = [
-  { name: 'Melcom Ghana', cat: 'Shopping', amount: '₵287.50', time: 'Today, 2:30 PM', risk: 5, riskColor: '#16a34a', status: 'Safe', statusColor: '#16a34a', dotColor: '#22c55e', bg: '#fff7ed', emoji: '🛍️' },
-  { name: 'Beans & Brews Cafe', cat: 'Food & Drink', amount: '₵42.45', time: 'Today, 10:15 AM', risk: 8, riskColor: '#16a34a', status: 'Safe', statusColor: '#16a34a', dotColor: '#22c55e', bg: '#f0fdf4', emoji: '☕' },
-  { name: 'Salary Deposit', cat: 'Income', amount: '+₵8,250.00', time: 'Yesterday, 9:00 AM', risk: 2, riskColor: '#16a34a', status: 'Safe', statusColor: '#16a34a', dotColor: '#22c55e', bg: '#eff6ff', amountColor: '#16a34a', emoji: '↙️' },
-  { name: 'ECG Payment', cat: 'Utilities', amount: '₵445.30', time: 'Jan 12, 4:20 PM', risk: 65, riskColor: '#d97706', status: 'Review', statusColor: '#d97706', dotColor: '#f59e0b', bg: '#faf5ff', emoji: '⚡' },
-  { name: 'Unknown Merchant', cat: 'Suspicious', amount: '₵1,499.99', time: 'Jan 11, 11:45 PM', risk: 92, riskColor: '#dc2626', status: 'Blocked', statusColor: '#dc2626', dotColor: '#ef4444', bg: '#fef2f2', emoji: '🛒' },
-]
+function fmtRelative(ts) {
+  const diff = Date.now() - new Date(ts).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m} min ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} hour${h > 1 ? 's' : ''} ago`
+  return `${Math.floor(h / 24)}d ago`
+}
+
+function riskLabel(score) { return score < 30 ? 'Low' : score < 70 ? 'Medium' : 'High' }
+function riskHex(score)   { return score < 30 ? '#22c55e' : score < 70 ? '#f59e0b' : '#ef4444' }
+function statusHex(s)     { return s === 'completed' ? '#16a34a' : s === 'review' ? '#d97706' : '#dc2626' }
+function statusLabel(s)   { return s === 'completed' ? 'Safe' : s === 'review' ? 'Review' : 'Blocked' }
+function txEmoji(cat)     { return cat === 'MERCHANT' ? '🛍️' : cat === 'AGENT' ? '🏦' : '💸' }
+
+const SEVERITY_STYLE = {
+  critical: { bg: '#fef2f2', border: '#fecaca', iconBg: '#ef4444', titleColor: '#dc2626', Icon: AlertTriangle },
+  high:     { bg: '#fff7ed', border: '#fed7aa', iconBg: '#f97316', titleColor: '#c2410c', Icon: AlertTriangle },
+  medium:   { bg: '#fffbeb', border: '#fde68a', iconBg: '#f59e0b', titleColor: '#d97706', Icon: AlertCircle },
+  low:      { bg: '#eff6ff', border: '#bfdbfe', iconBg: '#3b82f6', titleColor: '#2563eb', Icon: CheckCircle },
+}
 
 const statusCards = [
-  { icon: Brain, label: 'AI Detection', value: 'Active', bg: '#faf5ff', iconGrad: ['#a855f7', '#ec4899'], valueColor: '#9333ea' },
-  { icon: Fingerprint, label: 'MFA Enabled', value: 'Secure', bg: '#eff6ff', iconGrad: ['#3b82f6', '#6366f1'], valueColor: '#2563eb' },
-  { icon: Link2, label: 'Blockchain', value: 'Verified', bg: '#f0fdf4', iconGrad: ['#14b8a6', '#22c55e'], valueColor: '#059669' },
+  { Icon: Brain,       label: 'AI Detection', value: 'Active',   bg: '#faf5ff', iconGrad: ['#a855f7', '#ec4899'], valueColor: '#9333ea' },
+  { Icon: Fingerprint, label: 'MFA Enabled',  value: 'Secure',   bg: '#eff6ff', iconGrad: ['#3b82f6', '#6366f1'], valueColor: '#2563eb' },
+  { Icon: Link2,       label: 'Blockchain',   value: 'Verified', bg: '#f0fdf4', iconGrad: ['#14b8a6', '#22c55e'], valueColor: '#059669' },
 ]
 
-function RightPanel() {
+// ─── right panel ─────────────────────────────────────────────────────────────
+
+function RightPanel({ transactions, loading }) {
   const navigate = useNavigate()
   return (
     <div style={{ padding: '20px' }}>
@@ -37,38 +51,58 @@ function RightPanel() {
         <span style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Recent Transactions</span>
         <button onClick={() => navigate('/dashboard/transactions')} style={{ background: 'none', border: 'none', fontSize: '13px', color: '#4f6ef7', fontWeight: 500, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>View All</button>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-        {recentTxns.map((txn) => (
-          <div key={txn.name} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: txn.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
-              {txn.emoji}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{txn.name}</span>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: txn.amountColor || '#0f172a', flexShrink: 0, marginLeft: '6px' }}>{txn.amount}</span>
+      {loading ? <Loading /> : transactions.length === 0 ? (
+        <EmptyState message="No transactions yet." icon="💳" />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {transactions.map((tx) => {
+            const sLabel = statusLabel(tx.status)
+            const sColor = statusHex(tx.status)
+            const dColor = riskHex(tx.risk_score)
+            return (
+              <div key={tx.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>
+                  {txEmoji(tx.category)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{tx.recipient_phone}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', flexShrink: 0, marginLeft: '6px' }}>{fmtAmount(tx.amount)}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>{tx.category}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>{fmtRelative(tx.created_at)}</span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>· Risk: <strong style={{ color: riskHex(tx.risk_score) }}>{tx.risk_score}%</strong></span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 600, color: sColor }}>
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: dColor, display: 'inline-block' }} />
+                      {sLabel}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '1px' }}>{txn.cat}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>{txn.time}</span>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>· Risk: <strong style={{ color: txn.riskColor }}>{txn.risk}%</strong></span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11px', fontWeight: 600, color: txn.statusColor }}>
-                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: txn.dotColor, display: 'inline-block' }} />
-                  {txn.status}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
 
+// ─── main component ───────────────────────────────────────────────────────────
+
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { admin } = useAuth()
+
+  const { data: alertData, loading: alertLoading } = useApi('/api/alerts?limit=3')
+  const { data: txData,    loading: txLoading    } = useApi('/api/transactions?limit=5')
+
+  const alerts       = alertData?.alerts       ?? []
+  const transactions = txData?.transactions    ?? []
+  const liveTxns     = transactions.slice(0, 4)
+
   return (
-    <DashboardLayout rightPanel={<RightPanel />}>
+    <DashboardLayout rightPanel={<RightPanel transactions={transactions} loading={txLoading} />}>
       {/* Header banner */}
       <div style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #4338ca 50%, #0d9488 100%)', padding: '24px 28px 32px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
@@ -78,20 +112,24 @@ export default function Dashboard() {
           </div>
           <div onClick={() => navigate('/dashboard/alerts')} style={{ position: 'relative', cursor: 'pointer', padding: '6px' }}>
             <Bell size={20} color="#fff" />
-            <span style={{ position: 'absolute', top: '4px', right: '4px', width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%', display: 'block' }} />
+            {alerts.some(a => !a.read) && (
+              <span style={{ position: 'absolute', top: '4px', right: '4px', width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%', display: 'block' }} />
+            )}
           </div>
         </div>
 
         {/* User card */}
         <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '16px', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(99,102,241,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '14px', flexShrink: 0 }}>EA</div>
+            <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'rgba(99,102,241,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '14px', flexShrink: 0 }}>
+              {admin?.fullName?.slice(0, 2).toUpperCase() ?? 'AD'}
+            </div>
             <div>
-              <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>Ebenezer Sika-Sackinor Amanor</div>
-              <div style={{ color: '#a5b4fc', fontSize: '12px', marginTop: '1px' }}>ebenezeramanor@email.com</div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: '14px' }}>{admin?.fullName ?? 'Administrator'}</div>
+              <div style={{ color: '#a5b4fc', fontSize: '12px', marginTop: '1px' }}>{admin?.email ?? ''}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
                 <ShieldCheck size={12} color="#93c5fd" />
-                <span style={{ color: '#93c5fd', fontSize: '12px' }}>Trust Score: <strong style={{ color: '#fff' }}>98.5%</strong></span>
+                <span style={{ color: '#93c5fd', fontSize: '12px' }}>Role: <strong style={{ color: '#fff', textTransform: 'capitalize' }}>{admin?.role ?? 'admin'}</strong></span>
               </div>
             </div>
           </div>
@@ -104,7 +142,7 @@ export default function Dashboard() {
 
       {/* Status cards */}
       <div className="rg-3" style={{ padding: '20px 24px', marginTop: '-6px' }}>
-        {statusCards.map(({ icon: Icon, label, value, bg, iconGrad, valueColor }) => (
+        {statusCards.map(({ Icon, label, value, bg, iconGrad, valueColor }) => (
           <div key={label} style={{ background: bg, borderRadius: '16px', padding: '20px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
             <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: `linear-gradient(135deg, ${iconGrad[0]}, ${iconGrad[1]})`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
               <Icon size={20} color="#fff" />
@@ -125,20 +163,28 @@ export default function Dashboard() {
               <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>Live</span>
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {alerts.map(({ id, title, desc, time, icon: Icon, bg, border, iconBg, titleColor, italic }) => (
-              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '14px', background: bg, border: `1px solid ${border}` }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon size={17} color="#fff" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: titleColor, fontStyle: italic ? 'italic' : 'normal' }}>{title}</div>
-                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{desc}</div>
-                </div>
-                <span style={{ fontSize: '12px', color: '#94a3b8', flexShrink: 0 }}>{time}</span>
-              </div>
-            ))}
-          </div>
+          {alertLoading ? <Loading /> : alerts.length === 0 ? (
+            <EmptyState message="No alerts. System is clean." icon="✅" />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {alerts.map((alert) => {
+                const s = SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.low
+                const { Icon } = s
+                return (
+                  <div key={alert.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', borderRadius: '14px', background: s.bg, border: `1px solid ${s.border}` }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: s.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={17} color="#fff" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: s.titleColor }}>{alert.title}</div>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{alert.description}</div>
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#94a3b8', flexShrink: 0 }}>{fmtRelative(alert.created_at)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Live Transactions */}
@@ -153,32 +199,35 @@ export default function Dashboard() {
             </div>
             <button onClick={() => navigate('/dashboard/transactions')} style={{ background: 'none', border: 'none', fontSize: '13px', color: '#4f6ef7', fontWeight: 500, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>View All →</button>
           </div>
-          <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #f1f5f9', overflow: 'hidden' }}>
-            {liveTransactions.map((txn, i) => (
-              <div key={txn.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', borderBottom: i < liveTransactions.length - 1 ? '1px solid #f8fafc' : 'none' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '11px', background: 'linear-gradient(135deg, #4f6ef7, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <TrendingUp size={16} color="#fff" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{txn.id}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '3px', flexWrap: 'wrap' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '12px', color: '#94a3b8' }}><Clock size={11} /> {txn.time}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '12px', color: '#94a3b8' }}><MapPin size={11} /> {txn.location}</span>
+          {txLoading ? <Loading /> : liveTxns.length === 0 ? (
+            <EmptyState message="No transactions yet." icon="📊" />
+          ) : (
+            <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #f1f5f9', overflow: 'hidden' }}>
+              {liveTxns.map((tx, i) => (
+                <div key={tx.id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', borderBottom: i < liveTxns.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '11px', background: 'linear-gradient(135deg, #4f6ef7, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <TrendingUp size={16} color="#fff" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{tx.reference}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '3px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '12px', color: '#94a3b8' }}><Clock size={11} /> {new Date(tx.created_at).toLocaleTimeString('en-US', { hour12: false })}</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{fmtAmount(tx.amount)}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', marginTop: '3px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: riskHex(tx.risk_score) }}>{riskLabel(tx.risk_score)}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600, color: statusHex(tx.status) }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: riskHex(tx.risk_score), display: 'inline-block' }} />
+                        {statusLabel(tx.status)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{txn.amount}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'flex-end', marginTop: '3px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: txn.riskColor }}>{txn.risk}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 600, color: txn.statusColor }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: txn.dotColor, display: 'inline-block' }} />
-                      {txn.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </DashboardLayout>

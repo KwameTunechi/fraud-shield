@@ -3,6 +3,7 @@ import 'dotenv/config';
 import app from './app.js';
 import { pool } from './db/pool.js';
 import { connectRedis } from './db/redis.js';
+import { startLedgerVerifier } from './jobs/verifyLedger.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -17,6 +18,9 @@ async function start() {
   app.listen(PORT, () => {
     console.log(`FraudShield API running on http://localhost:${PORT}`);
   });
+
+  startLedgerVerifier();
+  console.log('Ledger integrity verifier started (interval: 10 min)');
 }
 
 start().catch((err) => {

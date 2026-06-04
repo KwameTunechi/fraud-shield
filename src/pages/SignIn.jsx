@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Shield, Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react'
+import { useAuth } from '../context/AuthContext.jsx'
+import { SignInSchema } from '../schemas/index.js'
 
 export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [form, setForm] = useState({ email: '', password: '' })
   const [forgotSent, setForgotSent] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [serverError, setServerError] = useState(null)
   const navigate = useNavigate()
+  const { signIn } = useAuth()
 
   const handleForgotPassword = (e) => {
     e.preventDefault()
@@ -14,9 +19,32 @@ export default function SignIn() {
     setTimeout(() => setForgotSent(false), 3000)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    navigate('/verify')
+    setServerError(null)
+
+    const parsed = SignInSchema.safeParse(form)
+    if (!parsed.success) {
+      setServerError('Please enter a valid email and password (min 8 characters).')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const result = await signIn(form.email, form.password)
+      // Pass the pendingToken (and QR URL if first-time setup) to the 2FA page
+      navigate('/verify', {
+        state: {
+          pendingToken: result.pendingToken,
+          setupRequired: result.status === 'mfa_setup_required',
+          otpauthUrl: result.otpauthUrl ?? null,
+        },
+      })
+    } catch (err) {
+      setServerError(err.message || 'Sign in failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const inputStyle = {
@@ -78,6 +106,20 @@ export default function SignIn() {
           Enter your credentials to access the dashboard
         </p>
 
+        {serverError && (
+          <div style={{
+            padding: '12px 16px',
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '10px',
+            fontSize: '13px',
+            color: '#dc2626',
+            marginBottom: '20px',
+          }}>
+            {serverError}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit}>
           {/* Email */}
           <div style={{ marginBottom: '18px' }}>
@@ -136,25 +178,26 @@ export default function SignIn() {
           {/* Submit */}
           <button
             type="submit"
+            disabled={loading}
             style={{
               width: '100%',
               padding: '15px',
-              background: 'linear-gradient(135deg, #4f6ef7, #7c3aed)',
+              background: loading ? '#a5b4fc' : 'linear-gradient(135deg, #4f6ef7, #7c3aed)',
               color: '#fff',
               border: 'none',
               borderRadius: '12px',
               fontSize: '15px',
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              boxShadow: '0 8px 20px rgba(79,110,247,0.35)',
+              boxShadow: loading ? 'none' : '0 8px 20px rgba(79,110,247,0.35)',
               fontFamily: 'Inter, sans-serif',
             }}
           >
-            Sign In <ArrowRight size={16} />
+            {loading ? 'Signing in…' : <> Sign In <ArrowRight size={16} /> </>}
           </button>
 
           <p style={{ textAlign: 'center', fontSize: '12px', color: '#94a3b8', marginTop: '14px' }}>

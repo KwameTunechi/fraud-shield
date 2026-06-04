@@ -1,17 +1,22 @@
 import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Shield, Smartphone, ArrowRight } from 'lucide-react'
+import { useNavigate, useLocation, Navigate } from 'react-router-dom'
+import { Shield, Smartphone, ArrowRight, Copy, Check } from 'lucide-react'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export default function TwoFactor() {
   const [code, setCode] = useState(['', '', '', '', '', ''])
-  const [resent, setResent] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [serverError, setServerError] = useState(null)
+  const [copied, setCopied] = useState(false)
   const inputs = useRef([])
   const navigate = useNavigate()
+  const location = useLocation()
+  const { verifyMfa } = useAuth()
 
-  const handleResend = () => {
-    setResent(true)
-    setTimeout(() => setResent(false), 3000)
-  }
+  const { pendingToken, setupRequired, otpauthUrl } = location.state ?? {}
+
+  // Guard: if someone navigates here directly without going through sign-in
+  if (!pendingToken) return <Navigate to="/signin" replace />
 
   const handleChange = (index, value) => {
     if (!/^\d?$/.test(value)) return
@@ -35,6 +40,33 @@ export default function TwoFactor() {
     }
   }
 
+  const handleVerify = async () => {
+    const codeStr = code.join('')
+    if (codeStr.length < 6) {
+      setServerError('Please enter all 6 digits.')
+      return
+    }
+    setServerError(null)
+    setLoading(true)
+    try {
+      await verifyMfa(pendingToken, codeStr)
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      setServerError(err.message || 'Invalid code. Please try again.')
+      setCode(['', '', '', '', '', ''])
+      inputs.current[0]?.focus()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const copyUrl = () => {
+    navigator.clipboard.writeText(otpauthUrl).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -54,7 +86,7 @@ export default function TwoFactor() {
       {/* Card */}
       <div style={{
         width: '100%',
-        maxWidth: '440px',
+        maxWidth: '480px',
         background: '#ffffff',
         borderRadius: '24px',
         padding: '48px 40px',
@@ -83,9 +115,74 @@ export default function TwoFactor() {
         <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
           Two-Factor Authentication
         </h2>
-        <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '32px', lineHeight: 1.6 }}>
-          Enter the 6-digit code from your authenticator app
+        <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '24px', lineHeight: 1.6 }}>
+          {setupRequired
+            ? 'First time setup — add FraudShield to your authenticator app, then enter the code below.'
+            : 'Enter the 6-digit code from your authenticator app.'}
         </p>
+
+        {/* First-time MFA setup: show the otpauth URL */}
+        {setupRequired && otpauthUrl && (
+          <div style={{
+            width: '100%',
+            background: '#f8fafc',
+            border: '1.5px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '24px',
+            textAlign: 'left',
+          }}>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+              Open Google Authenticator → + → Enter a setup key, then paste this URL:
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <code style={{
+                flex: 1,
+                fontSize: '11px',
+                color: '#4f6ef7',
+                wordBreak: 'break-all',
+                background: '#eef2ff',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                display: 'block',
+              }}>
+                {otpauthUrl}
+              </code>
+              <button
+                type="button"
+                onClick={copyUrl}
+                title="Copy URL"
+                style={{
+                  flexShrink: 0,
+                  background: copied ? '#dcfce7' : '#eef2ff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  cursor: 'pointer',
+                  color: copied ? '#16a34a' : '#4f6ef7',
+                }}
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {serverError && (
+          <div style={{
+            width: '100%',
+            padding: '12px 16px',
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '10px',
+            fontSize: '13px',
+            color: '#dc2626',
+            marginBottom: '20px',
+            textAlign: 'left',
+          }}>
+            {serverError}
+          </div>
+        )}
 
         {/* OTP Inputs */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '32px' }} onPaste={handlePaste}>
@@ -118,36 +215,28 @@ export default function TwoFactor() {
         </div>
 
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={handleVerify}
+          disabled={loading}
           style={{
             width: '100%',
             padding: '15px',
-            background: 'linear-gradient(135deg, #4f6ef7, #7c3aed)',
+            background: loading ? '#a5b4fc' : 'linear-gradient(135deg, #4f6ef7, #7c3aed)',
             color: '#fff',
             border: 'none',
             borderRadius: '12px',
             fontSize: '15px',
             fontWeight: 700,
-            cursor: 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            boxShadow: '0 8px 20px rgba(79,110,247,0.35)',
+            boxShadow: loading ? 'none' : '0 8px 20px rgba(79,110,247,0.35)',
             fontFamily: 'Inter, sans-serif',
             marginBottom: '16px',
           }}
         >
-          Verify & Continue <ArrowRight size={16} />
-        </button>
-
-        {resent && (
-          <div style={{ fontSize: '13px', color: '#16a34a', fontWeight: 600, marginBottom: '8px' }}>
-            ✓ Code sent to your device!
-          </div>
-        )}
-        <button onClick={handleResend} style={{ background: 'none', border: 'none', fontSize: '14px', color: resent ? '#94a3b8' : '#4f6ef7', fontWeight: 500, cursor: resent ? 'default' : 'pointer', fontFamily: 'Inter, sans-serif' }}>
-          Didn't receive a code? Resend
+          {loading ? 'Verifying…' : <> Verify &amp; Continue <ArrowRight size={16} /> </>}
         </button>
       </div>
 

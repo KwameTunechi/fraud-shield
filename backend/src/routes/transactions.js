@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import { pool, withTransaction } from '../db/pool.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { scoreTransaction } from '../services/risk/scorer.js';
+import { publish } from '../services/events/bus.js';
+import { appendEntry } from '../services/blockchain/ledger.js';
 
 const router = Router();
 
@@ -109,6 +111,43 @@ router.post('/', authenticate, async (req, res) => {
     }
     return tx;
   });
+
+  // Publish live event so the admin SSE stream updates immediately
+  publish('transaction.new', {
+    id: inserted.id, reference: inserted.reference,
+    amount, recipientPhone, score, status: inserted.status,
+    createdAt: inserted.created_at,
+  });
+  if (score >= REVIEW_THRESHOLD) {
+    publish('alert.new', { transactionId: inserted.id, score, reasons });
+  }
+
+  // Append to the blockchain audit trail AFTER the DB commit so we never
+  // log a transaction that did not actually persist
+  try {
+    const blockchainHash = await appendEntry({
+      eventType:     'transaction',
+      transactionId: inserted.id,
+      payload: {
+        reference:      inserted.reference,
+        senderId:       inserted.sender_id,
+        recipientPhone: inserted.recipient_phone,
+        amount:         inserted.amount,
+        score,
+        status:         inserted.status,
+        reasons,
+      },
+    });
+    // Back-fill the blockchain_hash column on the transaction row
+    await pool.query(
+      'UPDATE transactions SET blockchain_hash = $1 WHERE id = $2',
+      [blockchainHash, inserted.id]
+    );
+    inserted.blockchain_hash = blockchainHash;
+  } catch (err) {
+    // Blockchain append failure must not roll back the financial transaction
+    console.error('Blockchain append failed:', err.message);
+  }
 
   res.status(201).json({ transaction: inserted, score, status, reasons });
 });

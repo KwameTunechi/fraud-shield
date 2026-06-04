@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS blockchain_entries (
   previous_hash   TEXT,
   event_type      TEXT NOT NULL,  -- transaction | auth | admin_action
   transaction_id  UUID REFERENCES transactions(id),
-  payload         JSONB NOT NULL,
+  payload         TEXT NOT NULL,   -- raw JSON string; TEXT not JSONB so key order is preserved for hash verification
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

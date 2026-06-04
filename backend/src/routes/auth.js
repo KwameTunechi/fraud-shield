@@ -12,6 +12,7 @@ import { generateAndSendOtp, verifyOtp } from '../services/auth/otp.js';
 import { hashPin } from '../services/auth/pin.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { authenticate } from '../middleware/authenticate.js';
+import { appendEntry } from '../services/blockchain/ledger.js';
 
 const router = Router();
 
@@ -128,6 +129,12 @@ router.post('/admin/verify-mfa', async (req, res) => {
     maxAge:   7 * 24 * 60 * 60 * 1000,
     path:     '/api/auth',
   });
+
+  // Log the successful login to the immutable audit trail
+  appendEntry({
+    eventType: 'auth',
+    payload: { actor: 'admin', adminId: admin.id, action: 'signin_success', at: new Date().toISOString() },
+  }).catch((err) => console.error('Blockchain auth log failed:', err.message));
 
   res.json({
     status:      'ok',

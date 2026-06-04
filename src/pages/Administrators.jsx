@@ -1,20 +1,35 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Shield, Settings, Lock, ShieldCheck } from 'lucide-react'
 import DashboardLayout from '../components/DashboardLayout'
+import Loading from '../components/Loading'
+import EmptyState from '../components/EmptyState'
+import { useAuth } from '../context/AuthContext'
+import { useApi } from '../hooks/useApi'
 
-const admins = [
-  { num: 1, name: 'Ruth Jackson', id: '22427816', role: 'System Administrator', access: 'Full Access', accessColor: '#8b5cf6', accessBg: '#f5f3ff', dept: 'Security Operations' },
-  { num: 2, name: 'Emmanuel Kofi Ansah-Anobah', id: '22424531', role: 'Senior Administrator', access: 'Full Access', accessColor: '#8b5cf6', accessBg: '#f5f3ff', dept: 'Fraud Detection' },
-  { num: 3, name: 'James Ofori Essilfie', id: '22427805', role: 'Security Administrator', access: 'Read/Write', accessColor: '#3b82f6', accessBg: '#eff6ff', dept: 'Risk Management' },
-  { num: 4, name: 'Clive Kwesi Dsane', id: '22424554', role: 'Database Administrator', access: 'Database Access', accessColor: '#3b82f6', accessBg: '#eff6ff', dept: 'Data Management' },
-  { num: 5, name: 'Evans Adusu', id: '22424144', role: 'Network Administrator', access: 'Network Config', accessColor: '#3b82f6', accessBg: '#eff6ff', dept: 'Infrastructure' },
-  { num: 6, name: 'Ebenezer Sika-Sackinor Amanor', id: '22424626', role: 'Compliance Administrator', access: 'Audit Access', accessColor: '#3b82f6', accessBg: '#eff6ff', dept: 'Compliance' },
-  { num: 7, name: 'Daniel Asumadu', id: '22425827', role: 'Security Analyst', access: 'Read/Write', accessColor: '#3b82f6', accessBg: '#eff6ff', dept: 'Threat Analysis' },
-  { num: 8, name: 'Wilhelmina Naa Yemoley Tetteh', id: '22424680', role: 'Operations Administrator', access: 'Operations Access', accessColor: '#3b82f6', accessBg: '#eff6ff', dept: 'System Operations' },
-]
+const ROLE_STYLE = {
+  super_admin: { color: '#8b5cf6', bg: '#f5f3ff', label: 'Full Access'  },
+  supervisor:  { color: '#3b82f6', bg: '#eff6ff', label: 'Read/Write'  },
+  analyst:     { color: '#0d9488', bg: '#f0fdfa', label: 'Read Only'   },
+}
+
+function fmtRelative(ts) {
+  if (!ts) return 'Never'
+  const diff = Date.now() - new Date(ts).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`
+}
 
 export default function Administrators() {
   const navigate = useNavigate()
+  const { admin: me } = useAuth()
+  const { data, loading } = useApi('/api/admins')
+
+  const admins = data?.admins ?? []
+  const active = admins.filter(a => a.status === 'active').length
+
   return (
     <DashboardLayout>
       <div className="header-section" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #4338ca 50%, #0d9488 100%)' }}>
@@ -27,60 +42,75 @@ export default function Administrators() {
           </div>
           <div>
             <h1 style={{ color: '#fff', fontSize: 'clamp(16px,3.5vw,24px)', fontWeight: 800, margin: 0 }}>System Administrators</h1>
-            <p style={{ color: '#a5b4fc', fontSize: '12px', margin: '3px 0 0' }}>Access control, permissions & administrative roles</p>
+            <p style={{ color: '#a5b4fc', fontSize: '12px', margin: '3px 0 0' }}>Access control, permissions &amp; administrative roles</p>
           </div>
         </div>
       </div>
 
       <div className="page-pad">
+        {/* Stats */}
         <div className="rg-4" style={{ marginBottom: '22px' }}>
           {[
-            { icon: Shield, label: 'Total Admins', value: '8' },
-            { icon: ShieldCheck, label: 'Active Sessions', value: '8' },
-            { icon: Settings, label: 'Departments', value: '7' },
-            { icon: Lock, label: 'Access Levels', value: '5' },
+            { icon: Shield,     label: 'Total Admins',    value: loading ? '…' : admins.length },
+            { icon: ShieldCheck,label: 'Active',          value: loading ? '…' : active        },
+            { icon: Settings,   label: 'Roles',           value: '3'                            },
+            { icon: Lock,       label: 'You',             value: loading ? '…' : (me?.role ?? '—') },
           ].map(({ icon: Icon, label, value }) => (
             <div key={label} style={{ background: '#fff', borderRadius: '16px', padding: '18px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Icon size={19} color="#3b82f6" />
               </div>
               <div>
-                <div style={{ fontSize: 'clamp(18px,3vw,24px)', fontWeight: 800, color: '#0f172a' }}>{value}</div>
+                <div style={{ fontSize: 'clamp(18px,3vw,24px)', fontWeight: 800, color: '#0f172a', textTransform: 'capitalize' }}>{value}</div>
                 <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>{label}</div>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="rg-2" style={{ marginBottom: '20px' }}>
-          {admins.map((admin) => (
-            <div key={admin.id} style={{ background: '#fff', borderRadius: '16px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9', display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-              <div style={{ width: '46px', height: '46px', borderRadius: '13px', background: 'linear-gradient(135deg, #4f6ef7, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <ShieldCheck size={20} color="#fff" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '3px', gap: '8px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{admin.name}</div>
-                  <span style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#3b82f6', flexShrink: 0 }}>{admin.num}</span>
+        {loading ? <Loading /> : admins.length === 0 ? (
+          <EmptyState message="No administrators found." icon="🔐" />
+        ) : (
+          <div className="rg-2" style={{ marginBottom: '20px' }}>
+            {admins.map((admin, idx) => {
+              const rs = ROLE_STYLE[admin.role] ?? ROLE_STYLE.analyst
+              const isMe = admin.id === me?.id
+              return (
+                <div key={admin.id} style={{ background: '#fff', borderRadius: '16px', padding: '18px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: `1px solid ${isMe ? '#c7d2fe' : '#f1f5f9'}`, display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  <div style={{ width: '46px', height: '46px', borderRadius: '13px', background: 'linear-gradient(135deg, #4f6ef7, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <ShieldCheck size={20} color="#fff" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '3px', gap: '8px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {admin.full_name}
+                        {isMe && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#4f6ef7', background: '#eef2ff', padding: '1px 6px', borderRadius: '999px' }}>you</span>}
+                      </div>
+                      <span style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#3b82f6', flexShrink: 0 }}>{idx + 1}</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '8px' }}>{admin.email}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+                      <Settings size={11} color="#94a3b8" />
+                      <span style={{ fontSize: '12px', color: '#64748b', textTransform: 'capitalize' }}>{admin.role.replace('_', ' ')}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
+                      <Lock size={11} color="#94a3b8" />
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: rs.color, background: rs.bg, padding: '2px 8px', borderRadius: '5px' }}>{rs.label}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Shield size={11} color="#94a3b8" />
+                      <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                        MFA {admin.mfa_enabled ? 'enabled' : 'not set'} · Last login {fmtRelative(admin.last_login_at)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '8px' }}>Admin ID: {admin.id}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-                  <Settings size={11} color="#94a3b8" />
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>{admin.role}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}>
-                  <Lock size={11} color="#94a3b8" />
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: admin.accessColor, background: admin.accessBg, padding: '2px 8px', borderRadius: '5px' }}>{admin.access}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Shield size={11} color="#94a3b8" />
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>{admin.dept}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              )
+            })}
+          </div>
+        )}
 
+        {/* Team footer */}
         <div style={{ background: 'linear-gradient(135deg, #4f6ef7 0%, #7c3aed 50%, #0d9488 100%)', borderRadius: '20px', padding: 'clamp(20px,4vw,28px) clamp(20px,4vw,32px)' }}>
           <div className="rg-2">
             <div>
