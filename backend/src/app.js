@@ -6,8 +6,11 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 
-import healthRouter from './routes/health.js';
-import authRouter   from './routes/auth.js';
+import healthRouter       from './routes/health.js';
+import authRouter         from './routes/auth.js';
+import transactionsRouter from './routes/transactions.js';
+import alertsRouter       from './routes/alerts.js';
+import riskRouter         from './routes/risk.js';
 
 const app = express();
 
@@ -35,8 +38,11 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Routes
-app.use('/api/health', healthRouter);
-app.use('/api/auth',   authRouter);
+app.use('/api/health',       healthRouter);
+app.use('/api/auth',         authRouter);
+app.use('/api/transactions', transactionsRouter);
+app.use('/api/alerts',       alertsRouter);
+app.use('/api/risk',         riskRouter);
 
 // 404 handler
 app.use((req, res) => {
