@@ -1,12 +1,14 @@
 # FraudShield — AI-Powered Mobile Money Fraud Detection Platform
 
-A research project investigating the effectiveness of AI, blockchain, and multi-factor authentication (MFA) in combating fraud in Ghana's mobile money ecosystem (with a focus on Telecel Cash). The platform consists of two parts: a **web admin dashboard** for fraud analysts, and a **mobile simulation app** for demonstrating the user-side fraud-prevention experience.
+A research project at the **University of Ghana** (CSIT 621 — Emerging Technologies for Business I) investigating how layered defences — AI risk scoring, blockchain audit trails, and multi-factor authentication — reduce fraud in Ghana's mobile money ecosystem.
 
----
+Mobile money fraud losses in Ghana reached **GH₵14.94M in early 2025**. FraudShield combines three pillars to detect and prevent attacks in real time:
 
-## Background
-
-Mobile money in Ghana has significantly improved financial inclusion, but fraud — SIM swaps, phishing, fake reversals, account takeovers — has surged, with losses reported at **GH₵14.94M in early 2025 alone**. This platform simulates how layered defences (AI risk scoring, blockchain audit trails, and MFA) can detect and prevent these attacks in real time.
+| Pillar | Implementation |
+|--------|---------------|
+| 🤖 AI Risk Engine | Rule-based scorer with 6 explainable rules; every decision is auditable |
+| 🔗 Blockchain Ledger | SHA-256 hash-chained audit trail stored in PostgreSQL; tamper-evident |
+| 🔒 Multi-Factor Auth | Admin: password + TOTP · Customer: phone + SMS OTP + PIN + biometric |
 
 ---
 
@@ -14,207 +16,302 @@ Mobile money in Ghana has significantly improved financial inclusion, but fraud 
 
 ```
 fraud-shield/
+├── backend/                    # Node.js / Express API
+│   ├── src/
+│   │   ├── routes/             # auth, transactions, alerts, risk, blockchain,
+│   │   │                       # customers, admins, settings, events
+│   │   ├── services/           # auth (password, tokens, MFA, OTP, PIN),
+│   │   │                       # blockchain ledger, SSE event bus
+│   │   ├── middleware/         # authenticate, rateLimit
+│   │   ├── db/                 # PostgreSQL pool, Redis client, migrations, seed
+│   │   └── jobs/               # verifyLedger (integrity check every 10 min)
+│   ├── tests/                  # Vitest integration tests (53 passing)
+│   └── docker-compose.yml      # PostgreSQL 16 + Redis 7
 ├── src/                        # Web admin dashboard (React + Vite)
-│   ├── pages/                  # Route-level page components
-│   ├── components/             # Shared UI components (Sidebar, Layout, ErrorBoundary)
-│   ├── errors/                 # Domain-specific error class hierarchy
+│   ├── api/                    # API client (auto-refresh, circuit breaker, retry)
+│   ├── context/                # AuthContext (session restore, signIn, verifyMfa)
+│   ├── hooks/                  # useApi data-fetching hook
+│   ├── pages/                  # 11 dashboard pages, all wired to live backend
+│   ├── components/             # DashboardLayout, PrivateRoute, ErrorBoundary,
+│   │                           # Loading, EmptyState, Sidebar, Navbar
+│   ├── errors/                 # AppError, AuthError, NetworkError, ValidationError …
 │   ├── schemas/                # Zod validation schemas
-│   ├── utils/                  # Pure utilities (logger, async helpers, formatters)
-│   └── test/                   # Test setup, factories, render helpers
-├── mobile/                     # Mobile simulation app (React Native + Expo)
-│   └── src/
-│       ├── screens/            # Auth and main app screens
-│       ├── navigation/         # Stack and tab navigators
-│       ├── data/               # Mock transaction and user data
-│       └── utils/              # Fraud scenario simulator
-├── .github/workflows/ci.yml    # CI/CD pipeline (lint → test → build)
-└── coverage/                   # Generated coverage reports (gitignored)
+│   └── utils/                  # Logger, withTimeout, withRetry, createCircuitBreaker
+└── mobile/                     # React Native + Expo SDK 56
+    └── src/
+        ├── api/                # Fetch client with expo-secure-store token
+        ├── context/            # AuthContext (OTP, PIN, biometric, session restore)
+        ├── hooks/              # useApi hook
+        ├── navigation/         # AppNavigator, AuthNavigator, MainNavigator
+        └── screens/
+            ├── auth/           # Splash, SignIn, OTP, SetPin, Biometric
+            └── main/           # Home, SendMoney, Transactions, TransactionDetail,
+                                # Profile, Security, FraudScenario
 ```
 
 ---
 
-## Web Admin Dashboard
+## Running Locally
 
-Built with **React 19**, **Vite 8**, and **Tailwind CSS 4**.
+### Prerequisites
 
-### Features
+- Node.js ≥ 20
+- Docker Desktop
 
-| Page | Description |
-|---|---|
-| Landing Page | Public marketing page with platform overview |
-| Sign In | Organisation login with password visibility toggle and forgot-password flow |
-| Two-Factor Auth | OTP verification step after sign-in |
-| Dashboard | KPI overview — total transactions, risk score, blocked attempts, active alerts |
-| Live Transactions | Real-time transaction stream with per-row AI risk scores and status badges |
-| Risk Analytics | Anomaly detection chart, threat-category pie chart, 7-day risk trend, CSV export |
-| Blockchain Ledger | Immutable audit trail of flagged and confirmed transactions |
-| Customer Directory | Searchable list of registered users with trust scores and MFA status |
-| Alerts & Incidents | Active fraud alerts with severity levels and resolution workflow |
-| AI Configuration | Threshold tuning for risk model parameters |
-| Administrators | Admin user management |
-| System Settings | Platform-wide configuration |
+### 1 — Start the backend
 
-### Tech Stack
+```bash
+cd backend
+cp .env.example .env          # fill in JWT secrets (generate below)
+docker compose up -d          # start PostgreSQL + Redis
+npm install
+npm run db:migrate            # create all tables
+npm run db:seed               # insert demo admin + customer
+npm run dev                   # API at http://localhost:3000
+```
 
-- **React 19** — UI framework
-- **Vite 8** — build tool with HMR
-- **Tailwind CSS 4** — utility-first styling
-- **React Router v7** — client-side routing
-- **Recharts 3** — charting (area, line, pie)
-- **Lucide React** — icon library
-- **Zod 4** — runtime schema validation at system boundaries
+Generate strong JWT secrets (run twice, use different values):
 
----
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
 
-## Mobile Simulation App
+Verify the backend is healthy:
 
-Built with **React Native** and **Expo SDK 56**. Runnable on iOS, Android, or web via `npx expo start`.
+```bash
+curl http://localhost:3000/api/health
+# {"status":"healthy","checks":{"api":"ok","db":"ok","redis":"ok"}}
+```
 
-### Screens & Flows
+### 2 — Start the web dashboard
 
-**Authentication**
-- Splash screen with animated brand entry
-- Sign-in with email/password
-- OTP verification (6-digit code)
-- Biometric authentication (fingerprint / Face ID via `expo-local-authentication`)
+```bash
+# from repo root
+npm install
+npm run dev                   # http://localhost:5173
+```
 
-**Main App (Bottom Tabs)**
-- **Home** — wallet balance, quick-action buttons, recent transactions, live AI risk indicator
-- **Send Money** — 5-step flow: recipient → amount → AI risk check → MFA → confirmation. The AI risk check simulates real-time scoring and blocks or flags high-risk transfers
-- **Transactions** — filterable history with status badges (Safe / Review / Blocked)
-- **Transaction Detail** — blockchain audit entry for each transaction
-- **Security** — fraud scenario simulator (SIM swap, phishing, fake reversal, account takeover) with step-by-step attack/defence walkthrough
-- **Profile** — account settings, MFA toggle, security level indicator
+**Demo admin sign-in:**
+1. `/signin` → `admin@fraudshield.test` / `Password123!`
+2. First login shows an `otpauth://` URL — paste it into any QR generator and scan with Google Authenticator, or add manually via "Enter setup key"
+3. Enter the 6-digit TOTP code → dashboard
 
-### Tech Stack
-
-- **React Native** + **Expo SDK 56**
-- **React Navigation** (native-stack + bottom-tabs)
-- **expo-local-authentication** — biometric auth
-- **expo-linear-gradient** — UI gradients
-
-### Running the Mobile App
+### 3 — Run the mobile app
 
 ```bash
 cd mobile
 npm install
-npx expo start --web      # browser (fastest for development)
-npx expo start            # QR code for Expo Go on device
 ```
 
----
-
-## Testing
-
-The web app has a production-grade testing setup targeting **≥ 80% coverage** across all metrics.
-
-### Current Coverage
-
-| Metric | Coverage |
-|---|---|
-| Statements | **96.38%** |
-| Branches | **89.75%** |
-| Functions | **93.33%** |
-| Lines | **96.59%** |
-
-### Test Commands
+Edit `mobile/src/config.js` and replace the placeholder IP with your laptop's LAN IP (not `localhost` — the phone is a different device):
 
 ```bash
-npm test                  # run all tests once
-npm run test:watch        # interactive watch mode
-npm run test:coverage     # run with v8 coverage report
-npm run test:ui           # Vitest browser UI
+ipconfig          # Windows — look for IPv4 under your WiFi adapter
+ifconfig          # macOS / Linux
 ```
-
-### Architecture
-
-**Test infrastructure** (`src/test/`)
-- `setup.js` — global jest-dom matchers, ResizeObserver stub, URL.createObjectURL mock
-- `factories.js` — test data factories with auto-incrementing IDs (buildTransaction, buildCustomer, buildAlert, etc.)
-- `renderWithProviders.jsx` — `renderWithRouter()` helper wrapping MemoryRouter
-
-**Domain error hierarchy** (`src/errors/index.js`)
-```
-AppError
-├── ValidationError   — field-level Zod issues
-├── NetworkError      — HTTP failures with retryable flag
-├── AuthError         — authentication/authorisation failures
-├── FraudDetectionError — risk scoring results
-└── BlockchainError   — ledger write/read errors
-```
-
-**Structured logger** (`src/utils/logger.js`) — sanitises sensitive fields (password, token, secret, pin, otp) before any output. Exposes `info`, `warn`, `error`, `logError`, and `logApiCall`.
-
-**Async resilience utilities** (`src/utils/async.js`)
-- `withTimeout(promise, ms)` — rejects with `NetworkError` after timeout
-- `withRetry(fn, opts)` — exponential backoff with configurable `shouldRetry` predicate
-- `createCircuitBreaker(opts)` — open/closed circuit with auto-reset
-
-**Zod schemas** (`src/schemas/index.js`) — `TransactionSchema`, `CustomerSchema`, `SignInSchema`, `OtpSchema`, `AlertSchema` with Ghana phone number regex and typed enums.
-
-### Test Patterns Used
-
-- **AAA** (Arrange / Act / Assert) structure throughout
-- `userEvent` for realistic interaction (typing, clicking)
-- `fireEvent` for synchronous events in fake-timer contexts
-- `vi.useFakeTimers()` + `await act(() => vi.advanceTimersByTime(n))` for timer-dependent behaviour
-- Recharts mocked in jsdom to avoid SVG/ResizeObserver errors
-- `vi.spyOn(HTMLAnchorElement.prototype, 'click')` for CSV download tests
-
----
-
-## CI/CD Pipeline
-
-GitHub Actions runs three jobs on every push to `main`/`develop` and every PR targeting `main`:
-
-```
-lint ──┐
-       ├──► build
-test ──┘
-```
-
-| Job | What it does |
-|---|---|
-| **Lint** | `eslint src --max-warnings 0` — zero lint warnings allowed |
-| **Test** | `vitest run --coverage` — fails if any threshold < 80%; uploads coverage report as artifact; posts summary comment on PRs |
-| **Build** | `npm run build` — fails if bundle exceeds **2 MB**; uploads `dist/` as artifact |
-
----
-
-## Getting Started (Web)
 
 ```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-
-# Run tests
-npm test
-
-# Production build
-npm run build
+npx expo start    # scan QR in Expo Go on your phone
 ```
+
+**Demo customer sign-in:**
+- Enter any Ghana mobile number, e.g. `0244000001`
+- The OTP prints to the backend terminal in dev mode
+- Set a 4-digit PIN on first sign-in
+- Biometric is offered on phones that support it
 
 ---
 
-## Research Context
+## Backend API Reference
 
-This platform was developed as part of an academic research project at the **University of Ghana** investigating how composite security layers (AI anomaly detection + blockchain immutability + MFA friction) reduce fraud rates in the Ghanaian mobile money sector compared to single-layer defences. The mobile simulation app is used to demonstrate attack scenarios and corresponding system responses in user studies.
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/health` | — | DB + Redis health check |
+| POST | `/api/auth/admin/signin` | — | Email + password → pending token |
+| POST | `/api/auth/admin/verify-mfa` | — | TOTP → access token + cookie |
+| POST | `/api/auth/customer/request-otp` | — | Send OTP via SMS |
+| POST | `/api/auth/customer/verify-otp` | — | Verify OTP → tokens + `pinSetup` |
+| POST | `/api/auth/customer/set-pin` | user | Set PIN after first OTP |
+| POST | `/api/auth/customer/verify-pin` | — | PIN-only sign-in |
+| POST | `/api/auth/refresh` | — | Rotate access token |
+| POST | `/api/auth/signout` | — | Revoke session |
+| GET | `/api/auth/me` | any | Current user/admin profile |
+| GET | `/api/transactions` | any | Paginated list (customers see own only) |
+| POST | `/api/transactions` | user | Submit transaction (scored + recorded) |
+| POST | `/api/transactions/preview` | user | Score without persisting (mobile AI check) |
+| GET/PUT | `/api/transactions/:id` | any | Detail / admin status update |
+| GET | `/api/alerts` | any | Paginated alerts |
+| PUT | `/api/alerts/:id/read` | any | Mark as read |
+| PUT | `/api/alerts/:id/resolve` | admin | Resolve alert |
+| GET | `/api/risk/summary` | admin | KPI cards (24 h counts, avg risk) |
+| GET | `/api/risk/analytics` | admin | Chart data (byDay, byCategory) |
+| GET | `/api/blockchain` | admin | Paginated ledger entries |
+| GET | `/api/blockchain/verify` | admin | Chain integrity check |
+| GET | `/api/customers` | admin | Paginated customer list + search |
+| GET/POST/PUT/DELETE | `/api/admins` | admin | Admin CRUD (super_admin for writes) |
+| GET/PUT | `/api/ai-config` | admin | AI toggle settings |
+| GET/PUT | `/api/settings` | admin | System settings |
+| GET | `/api/events/stream` | admin | SSE live transaction feed |
+
+---
+
+## AI Risk Engine
+
+`backend/src/services/risk/scorer.js` — six rules, each transparent and auditable:
+
+| Rule key | Points | When it fires |
+|----------|--------|---------------|
+| `late_night` | 25 | Between 22:00–05:00 UTC |
+| `amount_above_2000_ghs` | 20 | Amount > GHS 2,000 |
+| `new_recipient` | 20 | No prior transaction to this phone |
+| `amount_3x_avg` | 15 | Amount > 3× sender's 30-day rolling average |
+| `rapid_succession` | 15 | > 3 transactions in the last 10 minutes |
+| `recipient_flagged` | 50 | Recipient appears in open alerts |
+
+**Thresholds:** 0–29 = Safe · 30–69 = Review · 70+ = Blocked
+
+Triggered rules are stored in `transactions.metadata.reasons` so every decision is fully auditable.
+
+---
+
+## Blockchain Ledger
+
+Each entry:
+
+```
+hash[0] = SHA-256("genesis" | eventType | payloadJson)
+hash[n] = SHA-256(hash[n-1] | eventType | payloadJson)
+```
+
+Events logged: every transaction, every successful admin sign-in.
+
+`GET /api/blockchain/verify` walks the entire chain and returns `{ ok: true }` or `{ ok: false, badAt: id, reason: "hash_mismatch" }`. A background job runs every 10 minutes and raises a critical alert if tampering is detected.
+
+---
+
+## Web Dashboard
+
+All 11 pages are wired to the live backend with no hardcoded mock data:
+
+| Page | Data source |
+|------|------------|
+| Dashboard | alerts + recent transactions + auth context (admin name/role) |
+| Live Transactions | `/api/transactions` + SSE stream (new rows appear without refresh) |
+| Risk Analytics | `/api/risk/analytics` byDay + byCategory → real Recharts data |
+| Alerts & Incidents | `/api/alerts` with Mark Read + Resolve buttons |
+| Blockchain Ledger | `/api/blockchain` + chain integrity banner |
+| Customer Directory | `/api/customers` with 300 ms debounced search |
+| AI Configuration | `/api/ai-config` toggles — each flip persists to DB immediately |
+| System Settings | `/api/settings` + real admin info from auth context |
+| Administrators | `/api/admins` with role badges + last-login times |
+
+---
+
+## Mobile App
+
+### Auth flow
+
+```
+Splash ──► SignIn (phone number)
+               │
+               ├── "Get OTP"  ──► OTPScreen ──► [SetPinScreen, first time] ──► BiometricScreen ──► Home
+               │
+               └── "Use PIN"  ──► PIN numpad ──► BiometricScreen ──► Home
+```
+
+Refresh token stored in `expo-secure-store`. On next app open the session is restored automatically — no re-authentication.
+
+### Main screens (all real data)
+
+| Screen | What's wired |
+|--------|-------------|
+| Home | Balance + trust score from auth; recent transactions + alerts; pull-to-refresh |
+| Send Money | Step 2 calls `/api/transactions/preview` → real AI score + plain-English reasons; step 3 posts the real transaction; result shows reference + blockchain hash |
+| Transactions | Full list with status filters + pull-to-refresh |
+| Transaction Detail | Fetches by ID; shows AI reasons, blockchain hash with Copy button |
+| Profile | Real name, balance, transaction count; sign out clears secure storage |
+
+---
+
+## Database Schema
+
+Migrations in `backend/src/db/migrations/`:
+
+| Table | Purpose |
+|-------|---------|
+| `admins` | Admin accounts (bcrypt password, TOTP secret) |
+| `users` | Customers (bcrypt PIN, trust score, balance) |
+| `transactions` | All transactions with risk score + blockchain hash |
+| `alerts` | Fraud alerts linked to transactions |
+| `blockchain_entries` | Immutable hash-chained audit log |
+| `sessions` | Refresh tokens (stored hashed, with expiry) |
+| `otp_codes` | SMS OTP records (hashed, TTL via Redis) |
+| `risk_models` | Risk model config |
+| `fraud_scenarios` | Simulator scenario definitions |
+| `settings` | AI config + system settings (JSONB key-value) |
+
+---
+
+## Tests
+
+```bash
+# Backend — 53 integration tests
+cd backend && npm test
+
+# Frontend
+npm test                    # run once
+npm run test:coverage       # v8 coverage report
+```
+
+Frontend test coverage: **96% statements / 89% branches / 93% functions**.
+
+Backend tests cover: admin auth (TOTP flow, rate limiting), customer auth (OTP, PIN, session), transactions (all 6 risk rules, blockchain integration), blockchain integrity (append, verify, tamper detection).
+
+---
+
+## CI/CD
+
+GitHub Actions on every push to `main`/`develop`:
+
+| Job | Steps |
+|-----|-------|
+| `web` | lint → test + coverage → build |
+| `backend` | npm ci → vitest against live Postgres + Redis service containers |
+| `mobile` | npm ci → test --if-present |
+
+---
+
+## Sprint Progress
+
+| Sprint | Description | Status |
+|--------|-------------|--------|
+| 0 | Team setup, GitHub workflow, local environment | ✅ |
+| 1 | Backend skeleton, DB schema, health endpoint | ✅ |
+| 2 | Admin auth — email, bcrypt, TOTP, JWT, rate limiting | ✅ |
+| 3 | Customer auth — phone, SMS OTP, PIN | ✅ |
+| 4 | Transactions, rule-based AI risk engine, alerts, analytics | ✅ |
+| 5 | Live blockchain audit trail + SSE real-time feed | ✅ |
+| 6 | Web: API client, AuthContext, PrivateRoute | ✅ |
+| 7 | Web: Dashboard, LiveTransactions, RiskAnalytics, Alerts | ✅ |
+| 8 | Web: all remaining pages + new backend endpoints | ✅ |
+| 9 | Mobile: auth — OTP, PIN, biometric, session restore | ✅ |
+| 10 | Mobile: Home, SendMoney, Transactions, Profile | ✅ |
+| 11 | Deploy: Railway (backend) + Vercel (web) + EAS (Android APK) | ⬜ |
+| 12 | Hardening: Sentry, Logtail, UptimeRobot, security audit | ⬜ |
 
 ---
 
 ## Team
 
-| Name | Role | GitHub |
-|---|---|---|
-| Evans Adusu | Project Lead / Web & Mobile | [@KwameTunechi](https://github.com/KwameTunechi) |
-
-> **Sprint 0 task for every team member:** fork this repo, create a branch `docs/yourname-add-to-team`, add your row to this table, open a pull request, and ask a teammate to review it. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+| Name | Role |
+|------|------|
+| Evans Adusu | Project Lead |
+| Group 6 | CSIT 621 — University of Ghana |
 
 ---
 
-## Contributing
+## Research Context
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching strategy, PR etiquette, and commit conventions used by this team.
+CSIT 621 — Emerging Technologies for Business I, University of Ghana. The platform investigates how composite security (AI + blockchain + MFA) compares to single-layer defences against SIM swap, phishing, fake reversal, and account-takeover fraud in Ghana's mobile money sector.
+
+Live URLs and APK download will be added here after Sprint 11.
