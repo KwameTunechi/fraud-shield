@@ -224,4 +224,34 @@ router.put('/:id/status', authenticate, requireAdmin, async (req, res) => {
   res.json(rows[0]);
 });
 
+// ─── POST /api/transactions/preview ─────────────────────────────────────────
+// Scores a transaction without persisting it. Used by the mobile app to show
+// the AI risk verdict before the user taps confirm.
+
+router.post('/preview', authenticate, async (req, res) => {
+  if (req.principal.type !== 'user') {
+    return res.status(403).json({ error: 'Customers only' });
+  }
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+  }
+  const { recipientPhone, amount } = parsed.data;
+
+  const { rows: senderRows } = await pool.query(
+    'SELECT * FROM users WHERE id = $1', [req.principal.sub]
+  );
+  const sender = senderRows[0];
+  if (!sender) return res.status(404).json({ error: 'Sender not found' });
+
+  const { score, status, reasons } = await scoreTransaction({
+    senderId: sender.id,
+    recipientPhone,
+    amount,
+    createdAt: new Date().toISOString(),
+  });
+
+  res.json({ score, status, reasons });
+});
+
 export default router;
