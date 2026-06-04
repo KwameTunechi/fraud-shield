@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 
 import healthRouter from './routes/health.js';
+import authRouter   from './routes/auth.js';
 
 const app = express();
 
@@ -35,6 +36,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Routes
 app.use('/api/health', healthRouter);
+app.use('/api/auth',   authRouter);
 
 // 404 handler
 app.use((req, res) => {
