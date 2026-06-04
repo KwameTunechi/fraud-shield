@@ -51,7 +51,7 @@ function SecurityStackNav() {
   );
 }
 
-export default function MainNavigator({ onSignOut }) {
+export default function MainNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({

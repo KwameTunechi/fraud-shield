@@ -213,6 +213,14 @@ describe('Risk scorer — rule thresholds', () => {
   it('scores 0 for a small daytime P2P transfer to a known recipient', async () => {
     const { scoreTransaction } = await import('../src/services/risk/scorer.js');
 
+    // Clear alerts from earlier tests so recipient_flagged rule doesn't fire
+    await pool.query(
+      `DELETE FROM alerts WHERE transaction_id IN (
+         SELECT id FROM transactions WHERE recipient_phone = $1
+       )`,
+      [RECIPIENT_PHONE]
+    );
+
     // Plant a prior transaction so "new_recipient" doesn't fire
     await pool.query(
       `INSERT INTO transactions

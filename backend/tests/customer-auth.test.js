@@ -130,8 +130,9 @@ describe('POST /api/auth/customer/verify-otp', () => {
     expect(res.body.accessToken).toBeDefined();
   });
 
-  it('returns 400 when new user omits PIN or fullName', async () => {
-    // Use a phone that has no user record
+  it('creates a new user without PIN and returns pinSetup:true', async () => {
+    // PIN is now optional — new users are created immediately and prompted to
+    // set a PIN afterwards via the mobile SetPinScreen flow.
     const bcrypt = (await import('bcrypt')).default;
     const hash = await bcrypt.hash('999999', 4);
     await redis.set(`otp:signin:${TEST_PHONE_2}`, hash, 'EX', 300);
@@ -140,8 +141,9 @@ describe('POST /api/auth/customer/verify-otp', () => {
       .post('/api/auth/customer/verify-otp')
       .send({ phone: TEST_PHONE_2, code: '999999' }); // no PIN or fullName
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/PIN and full name required/i);
+    expect(res.status).toBe(200);
+    expect(res.body.accessToken).toBeDefined();
+    expect(res.body.pinSetup).toBe(true);
   });
 });
 

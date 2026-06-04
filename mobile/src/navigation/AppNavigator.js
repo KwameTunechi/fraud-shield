@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
+import { useAuth } from '../context/AuthContext';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
+import SplashScreen from '../screens/auth/SplashScreen';
 
 export default function AppNavigator() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user, loading } = useAuth();
+
+  // Show splash while restoring session from secure storage
+  if (loading) return <SplashScreen static />;
 
   return (
     <View style={{ flex: 1 }}>
       <NavigationContainer>
-        {isAuthenticated
-          ? <MainNavigator onSignOut={() => setIsAuthenticated(false)} />
-          : <AuthNavigator onAuthSuccess={() => setIsAuthenticated(true)} />}
+        {user ? <MainNavigator /> : <AuthNavigator />}
       </NavigationContainer>
     </View>
   );

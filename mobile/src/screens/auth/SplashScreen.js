@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-export default function SplashScreen({ navigation }) {
+export default function SplashScreen({ navigation, static: isStatic }) {
   const scale = useRef(new Animated.Value(0.85)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -11,6 +11,8 @@ export default function SplashScreen({ navigation }) {
       Animated.spring(scale, { toValue: 1, useNativeDriver: false, tension: 50, friction: 7 }),
       Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: false }),
     ]).start();
+    // Skip auto-navigation when rendered as a static loading screen (no NavigationContainer)
+    if (isStatic || !navigation) return;
     const timer = setTimeout(() => navigation.replace('SignIn'), 2400);
     return () => clearTimeout(timer);
   }, []);

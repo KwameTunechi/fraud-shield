@@ -9,7 +9,7 @@ import {
 } from '../services/auth/tokens.js';
 import { generateMfaSecret, verifyMfaCode } from '../services/auth/mfa.js';
 import { generateAndSendOtp, verifyOtp } from '../services/auth/otp.js';
-import { hashPin } from '../services/auth/pin.js';
+import { hashPin, verifyPin } from '../services/auth/pin.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { appendEntry } from '../services/blockchain/ledger.js';
@@ -151,7 +151,8 @@ router.post('/admin/verify-mfa', async (req, res) => {
 // ─── POST /api/auth/refresh ──────────────────────────────────────────────────
 
 router.post('/refresh', async (req, res) => {
-  const raw = req.cookies?.refresh_token;
+  // Accept token from httpOnly cookie (web) or request body (mobile)
+  const raw = req.cookies?.refresh_token || req.body?.refreshToken;
   if (!raw) return res.status(401).json({ error: 'No refresh token' });
 
   const session = await findSessionByRefresh(raw);
@@ -179,7 +180,8 @@ router.post('/refresh', async (req, res) => {
 // ─── POST /api/auth/signout ──────────────────────────────────────────────────
 
 router.post('/signout', async (req, res) => {
-  const raw = req.cookies?.refresh_token;
+  // Accept token from httpOnly cookie (web) or request body (mobile)
+  const raw = req.cookies?.refresh_token || req.body?.refreshToken;
   if (raw) await revokeRefreshToken(raw);
   res.clearCookie('refresh_token', { path: '/api/auth' });
   res.json({ status: 'ok' });
@@ -245,17 +247,14 @@ router.post('/customer/verify-otp', async (req, res) => {
   const ok = await verifyOtp(phone, 'signin', code);
   if (!ok) return res.status(401).json({ error: 'Invalid or expired OTP' });
 
-  // Find or create the user
+  // Find or create the user — PIN is optional, can be set later via /customer/set-pin
   const { rows: existing } = await pool.query(
     'SELECT * FROM users WHERE phone_number = $1', [phone]
   );
   let user = existing[0];
 
   if (user) {
-    // Returning customer
-    if (!user.pin_hash && !pin) {
-      return res.status(400).json({ error: 'PIN required to complete account setup' });
-    }
+    // Returning customer — optionally update PIN if provided
     if (!user.pin_hash && pin) {
       const pinHash = await hashPin(pin);
       const { rows: updated } = await pool.query(
@@ -265,17 +264,16 @@ router.post('/customer/verify-otp', async (req, res) => {
       user = updated[0];
     }
   } else {
-    // New customer — PIN and full name required on first signup
-    if (!pin || !fullName) {
-      return res.status(400).json({ error: 'PIN and full name required for new signup' });
-    }
-    const pinHash = await hashPin(pin);
+    // New customer — PIN and full name are optional (can be set via set-pin later)
+    const pinHash = pin ? await hashPin(pin) : null;
     const { rows: inserted } = await pool.query(
       `INSERT INTO users (phone_number, pin_hash, full_name) VALUES ($1, $2, $3) RETURNING *`,
-      [phone, pinHash, fullName]
+      [phone, pinHash, fullName ?? 'New Customer']
     );
     user = inserted[0];
   }
+
+  const pinSetup = !user.pin_hash; // true when mobile should prompt PIN setup
 
   const accessToken = signAccessToken({
     sub:   user.id,
@@ -285,6 +283,70 @@ router.post('/customer/verify-otp', async (req, res) => {
 
   // Mobile apps can't use httpOnly cookies — send the refresh token in the body.
   // The mobile app stores it in expo-secure-store (iOS Keychain / Android Keystore).
+  const refreshToken = await issueRefreshToken({
+    userId:      user.id,
+    ip:          req.ip,
+    fingerprint: req.headers['user-agent'] || null,
+  });
+
+  res.json({
+    status:     'ok',
+    accessToken,
+    refreshToken,
+    pinSetup,   // mobile shows SetPinScreen when true
+    user: {
+      id:         user.id,
+      phone:      user.phone_number,
+      fullName:   user.full_name,
+      balance:    user.balance,
+      trustScore: user.trust_score,
+      pinSetup,
+    },
+  });
+});
+
+// ─── POST /api/auth/customer/set-pin ────────────────────────────────────────
+// Sets (or updates) the PIN for an already-authenticated customer.
+
+router.post('/customer/set-pin', authenticate, async (req, res) => {
+  if (req.principal.type !== 'user') {
+    return res.status(403).json({ error: 'Customers only' });
+  }
+  const { pin } = req.body ?? {};
+  if (!/^\d{4}$/.test(pin)) {
+    return res.status(400).json({ error: 'PIN must be exactly 4 digits' });
+  }
+  const pinHash = await hashPin(pin);
+  await pool.query('UPDATE users SET pin_hash = $1, updated_at = NOW() WHERE id = $2',
+    [pinHash, req.principal.sub]);
+  res.json({ status: 'ok' });
+});
+
+// ─── POST /api/auth/customer/verify-pin ─────────────────────────────────────
+// PIN-only sign-in for returning customers (skips OTP).
+
+const verifyPinSchema = z.object({
+  phone: ghanaPhone,
+  pin:   z.string().regex(/^\d{4}$/),
+});
+
+router.post('/customer/verify-pin', async (req, res) => {
+  const parsed = verifyPinSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid input' });
+  }
+  const { phone, pin } = parsed.data;
+
+  const { rows } = await pool.query('SELECT * FROM users WHERE phone_number = $1', [phone]);
+  const user = rows[0];
+  if (!user || !user.pin_hash) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  const ok = await verifyPin(pin, user.pin_hash);
+  if (!ok) return res.status(401).json({ error: 'Invalid PIN' });
+
+  const accessToken = signAccessToken({ sub: user.id, type: 'user', phone: user.phone_number });
   const refreshToken = await issueRefreshToken({
     userId:      user.id,
     ip:          req.ip,
