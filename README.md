@@ -331,8 +331,8 @@ See [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) for pre-deployment veri
 | 8 | Web: all remaining pages + new backend endpoints | ✅ |
 | 9 | Mobile: auth — OTP, PIN, biometric, session restore | ✅ |
 | 10 | Mobile: Home, SendMoney, Transactions, Profile | ✅ |
-| 11 | Deploy: Railway (backend) + Vercel (web) + EAS (Android APK) | ⬜ |
-| 12 | Hardening: Sentry, Logtail, UptimeRobot, security audit | ⬜ |
+| 11 | Deploy: Railway (backend) + Vercel (web) + EAS (Android APK) | ✅ |
+| 12 | Hardening: docs, tests, monitoring, security audit | ✅ |
 
 ---
 
