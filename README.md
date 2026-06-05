@@ -281,6 +281,41 @@ GitHub Actions on every push to `main`/`develop`:
 
 ---
 
+## Deployment
+
+### Production URLs
+
+**Backend API:** TBD (Railway)  
+**Web Dashboard:** TBD (Vercel)  
+**Mobile APK:** TBD (Expo EAS)
+
+### Quick Deploy
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment guide.
+
+**Backend (Railway):**
+1. Connect GitHub repo
+2. Set root directory: `backend`
+3. Add PostgreSQL + Redis
+4. Set environment variables
+5. Run migrations: `npm run db:migrate`
+
+**Web (Vercel):**
+1. Import GitHub repo
+2. Framework: Vite
+3. Set `VITE_API_URL` to Railway URL
+4. Deploy
+
+**Mobile (EAS):**
+```bash
+cd mobile
+eas build --profile preview --platform android
+```
+
+See [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) for pre-deployment verification.
+
+---
+
 ## Sprint Progress
 
 | Sprint | Description | Status |

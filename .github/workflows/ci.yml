@@ -8,6 +8,56 @@ on:
 
 jobs:
   # ─────────────────────────────────────────────────────────────
+  # Backend Tests
+  # ─────────────────────────────────────────────────────────────
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: fraudshield_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/fraudshield_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-secret-do-not-use-in-production
+          JWT_REFRESH_SECRET: test-refresh-secret-do-not-use
+          NODE_ENV: test
+        run: npm test
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
   # 1. Lint & type-check
   # ─────────────────────────────────────────────────────────────
   lint:
@@ -95,3 +145,26 @@ jobs:
           name: dist
           path: dist/
           retention-days: 3
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. Mobile App Tests (if tests exist)
+  # ─────────────────────────────────────────────────────────────
+  mobile:
+    name: Mobile Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Run mobile tests (if present)
+        working-directory: mobile
+        run: npm test --if-present
