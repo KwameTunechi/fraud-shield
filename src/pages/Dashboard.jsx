@@ -1,5 +1,9 @@
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCircle, AlertTriangle, AlertCircle, TrendingUp, Activity, DollarSign, Shield, Users } from 'lucide-react'
+import {
+  Bell, CheckCircle, AlertTriangle, AlertCircle, TrendingUp,
+  Activity, Shield, Users, BarChart3, Link2, UserCog, Brain,
+  Zap, ArrowUpRight
+} from 'lucide-react'
 import DashboardLayout from '../components/DashboardLayout'
 import Loading from '../components/Loading'
 import { useAuth } from '../context/AuthContext'
@@ -45,10 +49,10 @@ export default function Dashboard() {
 
   // KPI Cards data
   const kpis = [
-    { Icon: Activity, label: 'Transactions (24h)', value: summary?.transactionsLast24h ?? 0, color: '#4f6ef7', bg: '#eff6ff' },
-    { Icon: Shield, label: 'Blocked (24h)', value: summary?.blockedLast24h ?? 0, color: '#ef4444', bg: '#fef2f2' },
-    { Icon: Bell, label: 'Open Alerts', value: summary?.openAlerts ?? 0, color: '#f59e0b', bg: '#fffbeb' },
-    { Icon: TrendingUp, label: 'Avg Risk Score', value: summary?.averageRisk ?? 0, color: '#10b981', bg: '#f0fdf4', suffix: '%' },
+    { Icon: Activity, label: 'Transactions (24h)', value: summary?.transactionsLast24h ?? 0, color: '#4f6ef7', bg: '#eff6ff', gradient: 'linear-gradient(135deg, #4f6ef7, #6366f1)' },
+    { Icon: Shield, label: 'Blocked (24h)', value: summary?.blockedLast24h ?? 0, color: '#ef4444', bg: '#fef2f2', gradient: 'linear-gradient(135deg, #ef4444, #f87171)' },
+    { Icon: Bell, label: 'Open Alerts', value: summary?.openAlerts ?? 0, color: '#f59e0b', bg: '#fffbeb', gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)' },
+    { Icon: BarChart3, label: 'Avg Risk Score', value: summary?.averageRisk ?? 0, color: '#10b981', bg: '#f0fdf4', suffix: '%', gradient: 'linear-gradient(135deg, #10b981, #34d399)' },
   ]
 
   return (
@@ -79,15 +83,21 @@ export default function Dashboard() {
           {summaryLoading ? (
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'center', padding: '20px' }}><Loading /></div>
           ) : (
-            kpis.map(({ Icon, label, value, color, bg, suffix }) => (
-              <div key={label} style={{ background: '#fff', borderRadius: '12px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #f1f5f9' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon size={18} color={color} />
+            kpis.map(({ Icon, label, value, color, bg, suffix, gradient }) => (
+              <div key={label} style={{ background: '#fff', borderRadius: '14px', padding: '18px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100px', background: bg, borderRadius: '50%', transform: 'translate(40%, -40%)', opacity: 0.5 }} />
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                      <Icon size={20} color="#fff" strokeWidth={2.5} />
+                    </div>
+                    <div style={{ background: bg, padding: '4px 8px', borderRadius: '6px' }}>
+                      <ArrowUpRight size={12} color={color} />
+                    </div>
                   </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+                  <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f172a', lineHeight: 1 }}>{fmtCompact(value)}{suffix ?? ''}</div>
                 </div>
-                <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 500, marginBottom: '4px' }}>{label}</div>
-                <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{fmtCompact(value)}{suffix ?? ''}</div>
               </div>
             ))
           )}
@@ -157,20 +167,35 @@ export default function Dashboard() {
           </div>
 
           {/* Quick Actions - Row 3, Span 2 columns */}
-          <div style={{ gridColumn: 'span 2', background: '#fff', borderRadius: '12px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid #f1f5f9' }}>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginBottom: '12px' }}>Quick Actions</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-              <button onClick={() => navigate('/dashboard/risk')} style={{ padding: '12px', background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #bfdbfe', borderRadius: '10px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#1e40af' }}>📊 Risk Analytics</div>
+          <div style={{ gridColumn: 'span 2', background: '#fff', borderRadius: '14px', padding: '18px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <Zap size={16} color: '#f59e0b' />
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Quick Actions</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+              <button onClick={() => navigate('/dashboard/risk')} style={{ padding: '14px', background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1px solid #bfdbfe', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BarChart3 size={16} color="#fff" />
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#1e40af' }}>Risk Analytics</div>
               </button>
-              <button onClick={() => navigate('/dashboard/blockchain')} style={{ padding: '12px', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid #bbf7d0', borderRadius: '10px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#166534' }}>🔗 Blockchain</div>
+              <button onClick={() => navigate('/dashboard/blockchain')} style={{ padding: '14px', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', border: '1px solid #bbf7d0', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #10b981, #059669)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Link2 size={16} color="#fff" />
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#166534' }}>Blockchain</div>
               </button>
-              <button onClick={() => navigate('/dashboard/customers')} style={{ padding: '12px', background: 'linear-gradient(135deg, #faf5ff, #f3e8ff)', border: '1px solid #e9d5ff', borderRadius: '10px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#6b21a8' }}>👥 Customers</div>
+              <button onClick={() => navigate('/dashboard/customers')} style={{ padding: '14px', background: 'linear-gradient(135deg, #faf5ff, #f3e8ff)', border: '1px solid #e9d5ff', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #a855f7, #9333ea)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Users size={16} color="#fff" />
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#6b21a8' }}>Customers</div>
               </button>
-              <button onClick={() => navigate('/dashboard/ai-config')} style={{ padding: '12px', background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', border: '1px solid #fed7aa', borderRadius: '10px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: '#9a3412' }}>🤖 AI Config</div>
+              <button onClick={() => navigate('/dashboard/ai-config')} style={{ padding: '14px', background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', border: '1px solid #fed7aa', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'Inter, sans-serif', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.2s' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'linear-gradient(135deg, #f97316, #ea580c)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Brain size={16} color="#fff" />
+                </div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: '#9a3412' }}>AI Config</div>
               </button>
             </div>
           </div>
