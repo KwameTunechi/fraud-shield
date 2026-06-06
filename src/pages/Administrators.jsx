@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Shield, Settings, Lock, ShieldCheck } from 'lucide-react'
+import { useNavigate, Navigate } from 'react-router-dom'
+import { ArrowLeft, Shield, Settings, Lock, ShieldCheck, AlertTriangle } from 'lucide-react'
 import DashboardLayout from '../components/DashboardLayout'
 import Loading from '../components/Loading'
 import EmptyState from '../components/EmptyState'
@@ -24,8 +24,52 @@ function fmtRelative(ts) {
 
 export default function Administrators() {
   const navigate = useNavigate()
-  const { admin: me } = useAuth()
+  const { admin: me, loading: authLoading } = useAuth()
   const { data, loading } = useApi('/api/admins')
+
+  // Check if user is authenticated and has super_admin role
+  if (authLoading) {
+    return (
+      <DashboardLayout>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+          <Loading />
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  // Redirect if not super_admin
+  if (!me || me.role !== 'super_admin') {
+    return (
+      <DashboardLayout>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', padding: '24px' }}>
+          <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px' }}>
+            <AlertTriangle size={40} color="#ef4444" />
+          </div>
+          <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>Access Denied</h2>
+          <p style={{ fontSize: '14px', color: '#64748b', textAlign: 'center', maxWidth: '400px', marginBottom: '24px' }}>
+            Only Super Administrators can access this page. Your current role is: <strong style={{ color: '#0f172a', textTransform: 'capitalize' }}>{me?.role ?? 'Unknown'}</strong>
+          </p>
+          <button
+            onClick={() => navigate('/dashboard')}
+            style={{
+              background: 'linear-gradient(135deg, #4f6ef7, #7c3aed)',
+              color: '#fff',
+              border: 'none',
+              padding: '12px 24px',
+              borderRadius: '10px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'Inter, sans-serif',
+            }}
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   const admins = data?.admins ?? []
   const active = admins.filter(a => a.status === 'active').length
