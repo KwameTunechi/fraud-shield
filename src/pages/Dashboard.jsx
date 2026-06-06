@@ -169,7 +169,7 @@ export default function Dashboard() {
           {/* Quick Actions - Row 3, Span 2 columns */}
           <div style={{ gridColumn: 'span 2', background: '#fff', borderRadius: '14px', padding: '18px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #f1f5f9' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-              <Zap size={16} color: '#f59e0b' />
+              <Zap size={16} color="#f59e0b" />
               <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>Quick Actions</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
