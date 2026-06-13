@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, SafeAreaView, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { api } from '../../api/client';
 
 export default function FraudScenarioScreen({ route, navigation }) {
   const { scenario } = route.params;
   const [runningStep, setRunningStep] = useState(-1);
   const [done, setDone] = useState(false);
   const [started, setStarted] = useState(false);
+  const [txResult, setTxResult] = useState(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -17,6 +19,15 @@ export default function FraudScenarioScreen({ route, navigation }) {
         Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: false }),
       ])
     ).start();
+
+    // Submit the real transaction in parallel with the step animation.
+    // Blocked transactions don't deduct balance. The result appears in the
+    // admin dashboard and blockchain ledger as a real incident.
+    if (scenario.txParams) {
+      api.post('/api/transactions', scenario.txParams)
+        .then(data => setTxResult(data))
+        .catch(() => setTxResult(null));
+    }
 
     let step = 0;
     const interval = setInterval(() => {
@@ -91,6 +102,36 @@ export default function FraudScenarioScreen({ route, navigation }) {
                 ? 'The FraudShield AI + MFA system detected and blocked this attack before any funds were compromised. An incident report has been logged to the blockchain ledger.'
                 : 'The AI model flagged this as a high-probability fraud attempt. The user was warned and the suspicious activity was logged to the immutable blockchain audit trail.'}
             </Text>
+
+            {/* Real AI verdict from the live backend */}
+            {txResult && (
+              <View style={styles.liveResult}>
+                <Text style={styles.liveLabel}>Live AI Verdict</Text>
+                <View style={styles.liveRow}>
+                  <Text style={styles.liveKey}>Risk Score</Text>
+                  <Text style={[styles.liveVal, { color: outcomeColor, fontWeight: '800' }]}>{txResult.score}/100</Text>
+                </View>
+                <View style={styles.liveRow}>
+                  <Text style={styles.liveKey}>Decision</Text>
+                  <Text style={[styles.liveVal, { color: outcomeColor, textTransform: 'uppercase', fontWeight: '700' }]}>{txResult.status}</Text>
+                </View>
+                {txResult.transaction?.blockchain_hash && (
+                  <View style={styles.liveRow}>
+                    <Text style={styles.liveKey}>Blockchain Hash</Text>
+                    <Text style={[styles.liveVal, { fontFamily: 'monospace', fontSize: 10 }]}>
+                      {txResult.transaction.blockchain_hash.slice(0, 20)}…
+                    </Text>
+                  </View>
+                )}
+                {txResult.transaction?.reference && (
+                  <View style={styles.liveRow}>
+                    <Text style={styles.liveKey}>Reference</Text>
+                    <Text style={styles.liveVal}>{txResult.transaction.reference}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
             <View style={styles.outcomeStats}>
               <View style={styles.stat}>
                 <Text style={styles.statVal}>🤖</Text>
@@ -98,11 +139,11 @@ export default function FraudScenarioScreen({ route, navigation }) {
               </View>
               <View style={styles.stat}>
                 <Text style={styles.statVal}>🔗</Text>
-                <Text style={styles.statLabel}>Blockchain Logged</Text>
+                <Text style={styles.statLabel}>Blockchain{'\n'}Logged</Text>
               </View>
               <View style={styles.stat}>
                 <Text style={styles.statVal}>📊</Text>
-                <Text style={styles.statLabel}>Admin Alerted</Text>
+                <Text style={styles.statLabel}>Admin{'\n'}Alerted</Text>
               </View>
             </View>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -150,4 +191,9 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, color: '#64748b', fontWeight: '600', textAlign: 'center' },
   doneBtn: { borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28 },
   doneBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  liveResult: { width: '100%', backgroundColor: '#0f172a', borderRadius: 12, padding: 14, gap: 8 },
+  liveLabel: { color: '#94a3b8', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+  liveRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  liveKey: { color: '#64748b', fontSize: 12 },
+  liveVal: { color: '#e2e8f0', fontSize: 12, fontWeight: '600' },
 });

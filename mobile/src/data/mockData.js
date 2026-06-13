@@ -12,12 +12,17 @@ export const currentUser = {
   biometricEnabled: true,
 };
 
+// All 10 seeded demo users — phone numbers match the backend DB exactly
 export const contacts = [
-  { id: 'C1', name: 'Ama Owusu', phone: '+233 20 123 4567', initials: 'AO', network: 'Telecel Cash', recent: true },
-  { id: 'C2', name: 'Kofi Mensah', phone: '+233 24 987 6543', initials: 'KM', network: 'MTN MoMo', recent: true },
-  { id: 'C3', name: 'Akosua Boateng', phone: '+233 27 456 7890', initials: 'AB', network: 'Telecel Cash', recent: true },
-  { id: 'C4', name: 'Yaw Darko', phone: '+233 50 234 5678', initials: 'YD', network: 'AirtelTigo', recent: false },
-  { id: 'C5', name: 'Abena Frimpong', phone: '+233 24 111 2222', initials: 'AF', network: 'Telecel Cash', recent: false },
+  { id: 'C1', name: 'Ama Owusu',      phone: '+233201234567', initials: 'AO', network: 'Telecel Cash', recent: true  },
+  { id: 'C2', name: 'Kofi Mensah',    phone: '+233249876543', initials: 'KM', network: 'MTN MoMo',    recent: true  },
+  { id: 'C3', name: 'Akosua Boateng', phone: '+233274567890', initials: 'AB', network: 'AirtelTigo',  recent: true  },
+  { id: 'C4', name: 'Yaw Darko',      phone: '+233502345678', initials: 'YD', network: 'Telecel Cash', recent: true  },
+  { id: 'C5', name: 'Abena Frimpong', phone: '+233241112222', initials: 'AF', network: 'MTN MoMo',    recent: false },
+  { id: 'C6', name: 'Nana Adjei',     phone: '+233271234567', initials: 'NA', network: 'AirtelTigo',  recent: false },
+  { id: 'C7', name: 'Efua Quansah',   phone: '+233201111222', initials: 'EQ', network: 'Telecel Cash', recent: false },
+  { id: 'C8', name: 'Ebo Asiedu',     phone: '+233244444555', initials: 'EA', network: 'MTN MoMo',    recent: false },
+  { id: 'C9', name: 'Adwoa Boadi',    phone: '+233270987654', initials: 'AB', network: 'AirtelTigo',  recent: false },
 ];
 
 export const transactions = [
@@ -153,6 +158,9 @@ export const fraudScenarios = [
     ],
     outcome: 'blocked',
     outcome_text: 'Attack Blocked by AI',
+    // txParams: submitted to the real API when the simulation runs.
+    // +233559990001 is pre-flagged → rule 6 fires (+50 pts) → guaranteed blocked.
+    txParams: { recipientPhone: '+233559990001', amount: 3500, category: 'P2P' },
   },
   {
     id: 'FS-2',
@@ -171,8 +179,9 @@ export const fraudScenarios = [
       'Warning overlay displayed before any link is followed',
       'Incident logged to immutable blockchain audit trail',
     ],
-    outcome: 'detected',
-    outcome_text: 'Phishing Detected',
+    outcome: 'blocked',
+    outcome_text: 'Phishing Blocked',
+    txParams: { recipientPhone: '+233559990002', amount: 2500, category: 'MERCHANT' },
   },
   {
     id: 'FS-3',
@@ -191,8 +200,9 @@ export const fraudScenarios = [
       'Warning: "No unmatched incoming transaction detected — possible scam"',
       'User guided to verify via blockchain ledger before any action',
     ],
-    outcome: 'detected',
-    outcome_text: 'Scam Detected',
+    outcome: 'blocked',
+    outcome_text: 'Scam Blocked',
+    txParams: { recipientPhone: '+233559990003', amount: 3000, category: 'P2P' },
   },
   {
     id: 'FS-4',
@@ -213,6 +223,7 @@ export const fraudScenarios = [
     ],
     outcome: 'blocked',
     outcome_text: 'Takeover Blocked',
+    txParams: { recipientPhone: '+233559990004', amount: 4999, category: 'P2P' },
   },
 ];
 
