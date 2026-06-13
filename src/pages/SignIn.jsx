@@ -170,7 +170,7 @@ export default function SignIn() {
               <input type="checkbox" style={{ width: '16px', height: '16px', accentColor: '#4f6ef7', cursor: 'pointer' }} />
               Remember me
             </label>
-            <button onClick={handleForgotPassword} style={{ background: 'none', border: 'none', fontSize: '14px', color: forgotSent ? '#16a34a' : '#4f6ef7', fontWeight: 500, textDecoration: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', padding: 0 }}>
+            <button type="button" onClick={handleForgotPassword} style={{ background: 'none', border: 'none', fontSize: '14px', color: forgotSent ? '#16a34a' : '#4f6ef7', fontWeight: 500, textDecoration: 'none', cursor: 'pointer', fontFamily: 'Inter, sans-serif', padding: 0 }}>
               {forgotSent ? '✓ Reset link sent!' : 'Forgot password?'}
             </button>
           </div>
