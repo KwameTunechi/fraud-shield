@@ -1,13 +1,13 @@
 import { useState, useRef } from 'react'
 import { useNavigate, useLocation, Navigate } from 'react-router-dom'
-import { Shield, Smartphone, ArrowRight, Copy, Check } from 'lucide-react'
+import { Shield, Smartphone, ArrowRight } from 'lucide-react'
+import QRCode from 'react-qr-code'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function TwoFactor() {
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
   const [serverError, setServerError] = useState(null)
-  const [copied, setCopied] = useState(false)
   const inputs = useRef([])
   const navigate = useNavigate()
   const location = useLocation()
@@ -58,13 +58,6 @@ export default function TwoFactor() {
     } finally {
       setLoading(false)
     }
-  }
-
-  const copyUrl = () => {
-    navigator.clipboard.writeText(otpauthUrl).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
   }
 
   return (
@@ -121,50 +114,29 @@ export default function TwoFactor() {
             : 'Enter the 6-digit code from your authenticator app.'}
         </p>
 
-        {/* First-time MFA setup: show the otpauth URL */}
+        {/* First-time MFA setup: show QR code to scan */}
         {setupRequired && otpauthUrl && (
           <div style={{
             width: '100%',
             background: '#f8fafc',
             border: '1.5px solid #e2e8f0',
-            borderRadius: '12px',
-            padding: '16px',
+            borderRadius: '16px',
+            padding: '20px',
             marginBottom: '24px',
-            textAlign: 'left',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
           }}>
-            <p style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-              Open Google Authenticator → + → Enter a setup key, then paste this URL:
+            <p style={{ fontSize: '13px', fontWeight: 600, color: '#374151', margin: 0 }}>
+              Scan with Google Authenticator
             </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <code style={{
-                flex: 1,
-                fontSize: '11px',
-                color: '#4f6ef7',
-                wordBreak: 'break-all',
-                background: '#eef2ff',
-                padding: '8px 10px',
-                borderRadius: '8px',
-                display: 'block',
-              }}>
-                {otpauthUrl}
-              </code>
-              <button
-                type="button"
-                onClick={copyUrl}
-                title="Copy URL"
-                style={{
-                  flexShrink: 0,
-                  background: copied ? '#dcfce7' : '#eef2ff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  cursor: 'pointer',
-                  color: copied ? '#16a34a' : '#4f6ef7',
-                }}
-              >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-              </button>
+            <div style={{ background: '#fff', padding: '12px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+              <QRCode value={otpauthUrl} size={180} />
             </div>
+            <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>
+              Open the app → tap <strong>+</strong> → <strong>Scan a QR code</strong>
+            </p>
           </div>
         )}
 
