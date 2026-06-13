@@ -6,13 +6,6 @@ import Loading from '../components/Loading'
 import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
 
-const models = [
-  { name: 'Transaction Anomaly Detection', accuracy: 98.5, lastTrained: '2 hours ago',  progress: 98, dot: '#22c55e' },
-  { name: 'Behavioral Pattern Analysis',   accuracy: 96.2, lastTrained: 'In progress',  progress: 82, dot: '#3b82f6' },
-  { name: 'Fraud Risk Prediction',         accuracy: 97.8, lastTrained: '1 day ago',    progress: 97, dot: '#22c55e' },
-  { name: 'Account Takeover Detection',    accuracy: 94.3, lastTrained: '3 days ago',   progress: 70, dot: '#94a3b8' },
-]
-
 const TOGGLE_META = {
   anomaly:    { label: 'Anomaly Detection',  desc: 'Real-time transaction monitoring'         },
   blocking:   { label: 'Auto-Blocking',      desc: 'Automatically block suspicious activity'  },
@@ -30,7 +23,8 @@ function Toggle({ on, onToggle }) {
 
 export default function AIConfiguration() {
   const navigate = useNavigate()
-  const { data, loading } = useApi('/api/ai-config')
+  const { data, loading }              = useApi('/api/ai-config')
+  const { data: models, loading: modelsLoading } = useApi('/api/ai/models')
   const [toggles, setToggles] = useState(null)
   const [saving,  setSaving]  = useState(false)
 
@@ -96,7 +90,9 @@ export default function AIConfiguration() {
             <div>
               <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a', marginBottom: '14px' }}>Active Models</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {models.map((model) => (
+                {modelsLoading
+                  ? <Loading message="Loading models…" />
+                  : (models ?? []).map((model) => (
                   <div key={model.name} style={{ background: '#fff', borderRadius: '16px', padding: '18px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -126,6 +122,7 @@ export default function AIConfiguration() {
             </div>
           </div>
         )}
+
       </div>
     </DashboardLayout>
   )

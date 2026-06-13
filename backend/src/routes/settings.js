@@ -48,6 +48,39 @@ router.put('/ai-config/toggles', authenticate, requireAdmin, async (req, res) =>
   res.json(updated);
 });
 
+// ─── AI Models ───────────────────────────────────────────────────────────────
+
+function formatLastTrained(ts, status) {
+  if (status === 'training') return 'In progress';
+  if (!ts) return 'Never';
+  const diffMs = Date.now() - new Date(ts).getTime();
+  const mins  = Math.floor(diffMs / 60000);
+  const hours = Math.floor(mins / 60);
+  const days  = Math.floor(hours / 24);
+  if (days >= 1)  return days  === 1 ? '1 day ago'  : `${days} days ago`;
+  if (hours >= 1) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+  return mins <= 1 ? 'Just now' : `${mins} minutes ago`;
+}
+
+// GET /api/ai/models
+router.get('/ai/models', authenticate, requireAdmin, async (req, res) => {
+  const { rows } = await pool.query(
+    'SELECT id, name, version, accuracy, status, config, last_trained_at FROM risk_models ORDER BY created_at ASC'
+  );
+  const statusDot = { active: '#22c55e', training: '#3b82f6', inactive: '#94a3b8' };
+  const models = rows.map(r => ({
+    id:          r.id,
+    name:        r.name,
+    version:     r.version,
+    accuracy:    parseFloat(r.accuracy ?? 0),
+    status:      r.status,
+    progress:    r.config?.progress ?? Math.round(parseFloat(r.accuracy ?? 0)),
+    lastTrained: formatLastTrained(r.last_trained_at, r.status),
+    dot:         statusDot[r.status] ?? '#94a3b8',
+  }));
+  res.json(models);
+});
+
 // ─── System Settings ─────────────────────────────────────────────────────────
 
 // GET /api/settings
