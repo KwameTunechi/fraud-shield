@@ -1,8 +1,9 @@
 import React from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  SafeAreaView, Alert, Clipboard, StatusBar,
+  SafeAreaView, Alert, StatusBar,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { useApi } from '../../hooks/useApi';
 import Loading from '../../components/Loading';
@@ -78,9 +79,9 @@ export default function TransactionDetailScreen({ route, navigation }) {
   const { id } = route.params;
   const { data: txn, loading } = useApi(`/api/transactions/${id}`);
 
-  function copyHash() {
+  async function copyHash() {
     if (!txn?.blockchain_hash) return;
-    Clipboard.setString(txn.blockchain_hash);
+    await Clipboard.setStringAsync(txn.blockchain_hash);
     Alert.alert('Copied', 'Blockchain hash copied to clipboard.');
   }
 
