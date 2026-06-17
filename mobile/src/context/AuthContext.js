@@ -51,6 +51,7 @@ export function AuthProvider({ children }) {
             fullName:   me.full_name,
             balance:    me.balance,
             trustScore: me.trust_score,
+            mfaEnabled: me.mfa_enabled ?? false,
           })
         } else {
           await tokens.clearRefresh()
@@ -84,7 +85,7 @@ export function AuthProvider({ children }) {
     const result = await api.post('/api/auth/customer/verify-otp', { phone, code })
     tokens.setAccess(result.accessToken)
     await tokens.saveRefresh(result.refreshToken)
-    setPendingUser(result.user)
+    setPendingUser({ ...result.user, mfaEnabled: result.user.mfaEnabled ?? false })
     await saveRememberedPhone(phone)
     return result
   }
@@ -94,7 +95,7 @@ export function AuthProvider({ children }) {
     const result = await api.post('/api/auth/customer/verify-pin', { phone, pin })
     tokens.setAccess(result.accessToken)
     await tokens.saveRefresh(result.refreshToken)
-    setPendingUser(result.user)
+    setPendingUser({ ...result.user, mfaEnabled: result.user.mfaEnabled ?? false })
     await saveRememberedPhone(phone)
     // Store PIN so biometric can use it for future logins
     await SecureStore.setItemAsync(STORED_PIN_KEY, pin)
@@ -143,16 +144,31 @@ export function AuthProvider({ children }) {
     tokens.setAccess(result.accessToken)
     await tokens.saveRefresh(result.refreshToken)
     setUser({
-      id:         result.user?.id         ?? '',
-      phone:      result.user?.phone_number ?? phone,
-      fullName:   result.user?.full_name   ?? '',
-      balance:    result.user?.balance     ?? 0,
-      trustScore: result.user?.trust_score ?? 0,
+      id:         result.user?.id           ?? '',
+      phone:      result.user?.phone        ?? phone,
+      fullName:   result.user?.fullName     ?? '',
+      balance:    result.user?.balance      ?? 0,
+      trustScore: result.user?.trustScore   ?? 0,
+      mfaEnabled: result.user?.mfaEnabled   ?? true,
     })
   }
 
   function skipBiometric() {
     if (pendingUser) { setUser(pendingUser); setPendingUser(null); }
+  }
+
+  // Refresh the current user's balance and trust score from the server.
+  // Call this after submitting a transaction so the home screen stays in sync.
+  async function refreshUser() {
+    try {
+      const me = await api.get('/api/auth/me')
+      setUser(prev => prev ? {
+        ...prev,
+        balance:    me.balance    ?? prev.balance,
+        trustScore: me.trust_score ?? prev.trustScore,
+        mfaEnabled: me.mfa_enabled ?? prev.mfaEnabled,
+      } : prev)
+    } catch { /* best effort — stale balance is not critical */ }
   }
 
   // In-app biometric challenge — call this anywhere a sensitive action needs MFA.
@@ -200,6 +216,7 @@ export function AuthProvider({ children }) {
       requestOtp, verifyOtp, loginWithPin,
       setPin, completeBiometric, loginWithBiometric, skipBiometric,
       challengeBiometric,
+      refreshUser,
       signOut,
     }}>
       {children}

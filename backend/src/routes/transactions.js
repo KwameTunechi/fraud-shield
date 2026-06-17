@@ -221,6 +221,7 @@ router.put('/:id/status', authenticate, requireAdmin, async (req, res) => {
     [req.body.status, req.params.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Transaction not found' });
+  publish('transaction.status_changed', { id: rows[0].id, status: rows[0].status });
   res.json(rows[0]);
 });
 

@@ -68,7 +68,7 @@ function biometricReason(score, reasons, amount) {
 const QUICK_AMOUNTS = ['50', '100', '200', '500'];
 
 export default function SendMoneyScreen({ navigation }) {
-  const { user, challengeBiometric, biometricType } = useAuth();
+  const { user, challengeBiometric, biometricType, refreshUser } = useAuth();
 
   const [step,         setStep]         = useState(0);
   const [phone,        setPhone]        = useState('');
@@ -141,6 +141,7 @@ export default function SendMoneyScreen({ navigation }) {
         note,
       });
       setResult(transaction);
+      refreshUser(); // update balance in global state
       setStep(3);
     } catch (err) {
       Alert.alert('Transaction Failed', err.message ?? 'Please try again.');

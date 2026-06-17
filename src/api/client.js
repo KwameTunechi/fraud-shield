@@ -45,15 +45,21 @@ async function rawRequest(path, options = {}) {
   throw new AppError(body.error || 'Request failed', { code: `HTTP_${response.status}` })
 }
 
+const REFRESH_KEY = 'fs_admin_refresh'
+
 async function tryRefresh() {
   try {
+    const stored = localStorage.getItem(REFRESH_KEY)
     const response = await fetch(`${BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      ...(stored ? { body: JSON.stringify({ refreshToken: stored }) } : {}),
     })
     if (!response.ok) return false
-    const { accessToken: newToken } = await response.json()
-    setAccessToken(newToken)
+    const data = await response.json()
+    setAccessToken(data.accessToken)
+    if (data.refreshToken) localStorage.setItem(REFRESH_KEY, data.refreshToken)
     return true
   } catch {
     return false

@@ -110,7 +110,7 @@ export default function CustomerProfile() {
                   <AlertTriangle size={14} color="#FF8B00" style={{ marginTop: 2, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#0D1421' }}>{a.type?.replace(/_/g, ' ').toUpperCase()}</div>
-                    <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{a.message}</div>
+                    <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{a.description}</div>
                   </div>
                   <div style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>{fmtDate(a.created_at)}</div>
                 </div>

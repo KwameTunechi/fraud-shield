@@ -196,7 +196,7 @@ router.get('/me', authenticate, async (req, res) => {
   const { rows: meRows } = await pool.query(
     isAdmin
       ? 'SELECT id, email, full_name, role, last_login_at FROM admins WHERE id = $1'
-      : 'SELECT id, phone_number, full_name, balance, trust_score FROM users WHERE id = $1',
+      : 'SELECT id, phone_number, full_name, balance, trust_score, mfa_enabled FROM users WHERE id = $1',
     [req.principal.sub]
   );
   if (!meRows[0]) return res.status(404).json({ error: 'Account not found' });
@@ -260,7 +260,7 @@ router.post('/customer/verify-otp', async (req, res) => {
     if (!user.pin_hash && pin) {
       const pinHash = await hashPin(pin);
       const { rows: updated } = await pool.query(
-        'UPDATE users SET pin_hash = $1 WHERE id = $2 RETURNING *',
+        'UPDATE users SET pin_hash = $1, mfa_enabled = TRUE WHERE id = $2 RETURNING *',
         [pinHash, user.id]
       );
       user = updated[0];
@@ -269,8 +269,8 @@ router.post('/customer/verify-otp', async (req, res) => {
     // New customer — PIN and full name are optional (can be set via set-pin later)
     const pinHash = pin ? await hashPin(pin) : null;
     const { rows: inserted } = await pool.query(
-      `INSERT INTO users (phone_number, pin_hash, full_name) VALUES ($1, $2, $3) RETURNING *`,
-      [phone, pinHash, fullName ?? 'New Customer']
+      `INSERT INTO users (phone_number, pin_hash, full_name, mfa_enabled) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [phone, pinHash, fullName ?? 'New Customer', !!pinHash]
     );
     user = inserted[0];
   }
@@ -302,6 +302,7 @@ router.post('/customer/verify-otp', async (req, res) => {
       fullName:   user.full_name,
       balance:    user.balance,
       trustScore: user.trust_score,
+      mfaEnabled: user.mfa_enabled,
       pinSetup,
     },
   });
@@ -319,8 +320,10 @@ router.post('/customer/set-pin', authenticate, async (req, res) => {
     return res.status(400).json({ error: 'PIN must be exactly 4 digits' });
   }
   const pinHash = await hashPin(pin);
-  await pool.query('UPDATE users SET pin_hash = $1, updated_at = NOW() WHERE id = $2',
-    [pinHash, req.principal.sub]);
+  await pool.query(
+    'UPDATE users SET pin_hash = $1, mfa_enabled = TRUE, updated_at = NOW() WHERE id = $2',
+    [pinHash, req.principal.sub]
+  );
   res.json({ status: 'ok' });
 });
 
@@ -348,6 +351,13 @@ router.post('/customer/verify-pin', async (req, res) => {
   const ok = await verifyPin(pin, user.pin_hash);
   if (!ok) return res.status(401).json({ error: 'Invalid PIN' });
 
+  // Ensure mfa_enabled is TRUE for users who have a working PIN
+  // (backfills any users created before this field was tracked)
+  if (!user.mfa_enabled) {
+    await pool.query('UPDATE users SET mfa_enabled = TRUE WHERE id = $1', [user.id]);
+    user.mfa_enabled = true;
+  }
+
   const accessToken = signAccessToken({ sub: user.id, type: 'user', phone: user.phone_number });
   const refreshToken = await issueRefreshToken({
     userId:      user.id,
@@ -365,6 +375,7 @@ router.post('/customer/verify-pin', async (req, res) => {
       fullName:   user.full_name,
       balance:    user.balance,
       trustScore: user.trust_score,
+      mfaEnabled: user.mfa_enabled,
     },
   });
 });
