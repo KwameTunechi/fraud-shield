@@ -26,13 +26,14 @@ const C = {
 };
 
 const REASON_LABELS = {
-  late_night:            'Late-night transaction (22:00–05:00)',
-  amount_above_2000_ghs: 'Amount above GHS 2,000',
-  new_recipient:         'New recipient — no prior transactions',
-  amount_3x_avg:         'Amount 3× your rolling average',
-  rapid_succession:      'Multiple transactions in quick succession',
-  recipient_flagged:     'Recipient flagged in recent alerts',
-  amount_3x_rolling_avg: 'Amount exceeds 3× rolling average',
+  late_night:                  'Late-night transaction (22:00–05:00)',
+  amount_above_2000_ghs:       'Amount above GHS 2,000',
+  new_recipient:               'New recipient — no prior transactions',
+  amount_3x_avg:               'Amount 3× your rolling average',
+  amount_3x_rolling_avg:       'Amount exceeds 3× rolling average',
+  rapid_succession:            'Multiple transactions in quick succession',
+  recipient_flagged:           'Recipient flagged in recent alerts',
+  recipient_flagged_in_alerts: 'Recipient flagged in recent alerts',
 };
 
 function fmtMoney(n) {

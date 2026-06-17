@@ -58,7 +58,7 @@ export default function OTPScreen({ navigation, route }) {
     setError('');
     try {
       const result = await verifyOtp(phone, code);
-      if (result.pinSetup === false) {
+      if (result.pinSetup) {
         navigation.replace('SetPin');
       } else {
         navigation.replace('Biometric');

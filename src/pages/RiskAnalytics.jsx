@@ -13,7 +13,7 @@ export default function RiskAnalytics() {
   const navigate = useNavigate()
   const [range, setRange] = useState('30d')
 
-  const { data: analytics, loading: aLoading } = useApi('/api/risk/analytics')
+  const { data: analytics, loading: aLoading } = useApi(`/api/risk/analytics?range=${range}`)
   const { data: summary,   loading: sLoading } = useApi('/api/risk/summary')
 
   // Map byDay → AreaChart (risk over time)

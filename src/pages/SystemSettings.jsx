@@ -106,7 +106,7 @@ function EditModal({ fieldKey, current, onSave, onClose }) {
 export default function SystemSettings() {
   const navigate = useNavigate()
   const { admin, signOut } = useAuth()
-  const { data: cfg, loading, mutate } = useApi('/api/settings')
+  const { data: cfg, loading } = useApi('/api/settings')
   const { data: adminsData }           = useApi('/api/admins')
 
   const [settings, setSettings] = useState({})

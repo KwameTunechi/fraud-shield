@@ -60,12 +60,8 @@ export default function SignInScreen({ navigation }) {
     if (!normalized) { setError('Enter a valid 10-digit Ghana mobile number.'); return; }
     setLoading(true);
     try {
-      const res = await requestOtp(normalized);
-      if (res?.pinSetup === false) {
-        navigation.navigate('OTP', { phone: normalized });
-      } else {
-        setMode('pin');
-      }
+      await requestOtp(normalized);
+      navigation.navigate('OTP', { phone: normalized });
     } catch (err) {
       setError(err.message ?? 'Could not verify number.');
     } finally {
@@ -298,31 +294,6 @@ export default function SignInScreen({ navigation }) {
               >
                 <Text style={styles.primaryBtnText}>{loading ? 'Please wait…' : 'Continue'}</Text>
                 {!loading && <Ionicons name="arrow-forward" size={18} color="#fff" />}
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* ── MANUAL PHONE ENTRY → PIN ── */}
-          {mode === 'pin' && (
-            <View style={styles.card}>
-              <TouchableOpacity
-                style={styles.backRow}
-                onPress={() => { setMode('phone'); setPin(''); setError(''); }}
-              >
-                <Ionicons name="arrow-back" size={16} color={C.textSub} />
-                <Text style={styles.backText}>Change number</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.cardTitle}>Enter your PIN</Text>
-              <Text style={styles.cardSub}>4-digit PIN for {normalizePhone(phone) ?? phone}</Text>
-
-              <PinNumpad onSubmit={handlePinLogin} submitLabel="Sign In" />
-
-              <TouchableOpacity
-                style={styles.altLinks}
-                onPress={() => navigation.navigate('OTP', { phone: normalizePhone(phone) })}
-              >
-                <Text style={styles.linkText}>Sign in with OTP instead</Text>
               </TouchableOpacity>
             </View>
           )}

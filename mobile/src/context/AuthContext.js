@@ -105,7 +105,7 @@ export function AuthProvider({ children }) {
   // Step 3: set PIN for new users
   async function setPin(pin) {
     await api.post('/api/auth/customer/set-pin', { pin })
-    if (pendingUser) setPendingUser({ ...pendingUser, pinSetup: false })
+    if (pendingUser) setPendingUser({ ...pendingUser, pinSetup: false, mfaEnabled: true })
     // Store PIN for future biometric use
     const phone = await SecureStore.getItemAsync(REMEMBERED_PHONE_KEY)
     if (phone) await SecureStore.setItemAsync(STORED_PIN_KEY, pin)
