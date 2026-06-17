@@ -1,24 +1,56 @@
 import React from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet, SafeAreaView, Alert,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet, SafeAreaView, Alert, StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 
-function fmtAmount(n) {
+const C = {
+  primary:      '#1652F0',
+  primaryLight: '#EBF0FE',
+  success:      '#00875A',
+  successLight: '#E3F5F0',
+  warning:      '#FF8B00',
+  danger:       '#DE350B',
+  text:         '#0D1421',
+  textSub:      '#6B7280',
+  textMuted:    '#9CA3AF',
+  bg:           '#F5F7FA',
+  surface:      '#FFFFFF',
+  border:       '#E8ECEF',
+};
+
+function fmtMoney(n) {
   return '₵' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 });
+}
+
+function MenuItem({ icon, label, sublabel, onPress, destructive, rightIcon }) {
+  return (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.menuIcon, destructive && styles.menuIconDanger]}>
+        <Ionicons name={icon} size={18} color={destructive ? C.danger : C.primary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.menuLabel, destructive && { color: C.danger }]}>{label}</Text>
+        {sublabel && <Text style={styles.menuSub}>{sublabel}</Text>}
+      </View>
+      <Ionicons name={rightIcon ?? 'chevron-forward'} size={16} color={C.textMuted} />
+    </TouchableOpacity>
+  );
 }
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const { data: txData  } = useApi('/api/transactions?limit=100');
+  const { data: txData    } = useApi('/api/transactions?limit=100');
   const { data: alertData } = useApi('/api/alerts?limit=100');
 
-  const txCount    = txData?.transactions?.length    ?? 0;
-  const alertCount = alertData?.alerts?.length        ?? 0;
-  const trustScore = user?.trustScore ?? 0;
-  const scoreColor = trustScore >= 80 ? '#16a34a' : '#d97706';
+  const txCount    = txData?.transactions?.length ?? 0;
+  const alertCount = alertData?.alerts?.length    ?? 0;
+  const trust      = user?.trustScore ?? 0;
+  const trustColor = trust >= 80 ? C.success : trust >= 60 ? C.warning : C.danger;
+
+  const initials = (user?.fullName ?? 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   function confirmSignOut() {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -27,116 +59,117 @@ export default function ProfileScreen() {
     ]);
   }
 
-  const initials = (user?.fullName ?? 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-
   return (
     <SafeAreaView style={styles.safe}>
-      <LinearGradient colors={['#1e3a8a', '#4338ca', '#0d9488']} style={styles.header}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
-        <Text style={styles.name}>{user?.fullName ?? 'Customer'}</Text>
-        <Text style={styles.phone}>{user?.phone ?? ''}</Text>
-        <View style={styles.verifiedPill}>
-          <Text style={styles.verifiedText}>✅ KYC Verified</Text>
-        </View>
-      </LinearGradient>
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
 
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 14 }} showsVerticalScrollIndicator={false}>
-        {/* Stats */}
-        <View style={styles.stats}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Profile</Text>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+
+        {/* Avatar + name */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+          <Text style={styles.profileName}>{user?.fullName ?? 'Customer'}</Text>
+          <Text style={styles.profilePhone}>{user?.phone ?? ''}</Text>
+          <View style={styles.kycBadge}>
+            <Ionicons name="shield-checkmark" size={13} color={C.success} />
+            <Text style={styles.kycText}>KYC Verified</Text>
+          </View>
+        </View>
+
+        {/* Stats row */}
+        <View style={styles.statsCard}>
           <View style={styles.stat}>
-            <Text style={[styles.statVal, { color: scoreColor }]}>{trustScore}%</Text>
+            <Text style={[styles.statValue, { color: trustColor }]}>{trust}%</Text>
             <Text style={styles.statLabel}>Trust Score</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.stat}>
-            <Text style={styles.statVal}>{txCount}</Text>
+            <Text style={styles.statValue}>{txCount}</Text>
             <Text style={styles.statLabel}>Transactions</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.stat}>
-            <Text style={styles.statVal}>{alertCount}</Text>
-            <Text style={styles.statLabel}>Alerts</Text>
+            <Text style={styles.statValue}>{fmtMoney(user?.balance ?? 0)}</Text>
+            <Text style={styles.statLabel}>Balance</Text>
           </View>
         </View>
 
-        {/* Account info */}
+        {/* Account section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Information</Text>
-          {[
-            { label: 'Phone Number', value: user?.phone ?? '—' },
-            { label: 'Balance',      value: fmtAmount(user?.balance ?? 0) },
-            { label: 'Network',      value: 'Telecel Cash' },
-          ].map(({ label, value }) => (
-            <View key={label} style={styles.row}>
-              <Text style={styles.rowKey}>{label}</Text>
-              <Text style={styles.rowVal}>{value}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Security settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Security Settings</Text>
-          {[
-            { label: '🔒 PIN Authentication', value: 'Enabled',   color: '#16a34a' },
-            { label: '📲 OTP Verification',   value: 'Enabled',   color: '#16a34a' },
-            { label: '👆 Biometric Auth',      value: 'Enabled',   color: '#16a34a' },
-            { label: '🤖 AI Monitoring',       value: 'Active',    color: '#7c3aed' },
-            { label: '🔗 Blockchain Audit',    value: 'Active',    color: '#059669' },
-          ].map(({ label, value, color }) => (
-            <View key={label} style={styles.row}>
-              <Text style={styles.rowKey}>{label}</Text>
-              <Text style={[styles.rowVal, { color }]}>{value}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Research context */}
-        <View style={styles.researchCard}>
-          <Text style={styles.researchTitle}>📋 Research Simulation</Text>
-          <Text style={styles.researchText}>
-            This mobile app is part of a research project investigating AI, blockchain, and MFA-based fraud prevention for Ghana's mobile money ecosystem (Telecel Cash). All transactions are recorded on a real blockchain ledger for demonstration purposes.
-          </Text>
-          <View style={styles.researchTags}>
-            {['University of Ghana', 'Telecel Cash', 'CSIT 621'].map(t => (
-              <View key={t} style={styles.tag}><Text style={styles.tagText}>{t}</Text></View>
-            ))}
+          <Text style={styles.sectionTitle}>Account</Text>
+          <View style={styles.menuCard}>
+            <MenuItem icon="person-outline"          label="Personal Information" sublabel="Name, phone number" onPress={() => {}} />
+            <View style={styles.menuDivider} />
+            <MenuItem icon="card-outline"            label="Payment Methods"      sublabel="Linked accounts"   onPress={() => {}} />
+            <View style={styles.menuDivider} />
+            <MenuItem icon="document-text-outline"   label="Transaction History"  sublabel={`${txCount} transactions`} onPress={() => {}} />
           </View>
         </View>
 
-        <TouchableOpacity style={styles.signOutBtn} onPress={confirmSignOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
+        {/* Security section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Security</Text>
+          <View style={styles.menuCard}>
+            <MenuItem icon="keypad-outline"          label="Change PIN"           onPress={() => {}} />
+            <View style={styles.menuDivider} />
+            <MenuItem icon="finger-print-outline"    label="Biometric Login"      sublabel={user?.mfaEnabled ? 'Enabled' : 'Disabled'} onPress={() => {}} />
+            <View style={styles.menuDivider} />
+            <MenuItem icon="notifications-outline"   label="Notifications"        onPress={() => {}} />
+          </View>
+        </View>
+
+        {/* Support section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Support</Text>
+          <View style={styles.menuCard}>
+            <MenuItem icon="help-circle-outline"     label="Help & Support"       onPress={() => {}} />
+            <View style={styles.menuDivider} />
+            <MenuItem icon="information-circle-outline" label="About FraudShield" sublabel="Version 1.0.0"   onPress={() => {}} />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.menuCard}>
+            <MenuItem icon="log-out-outline" label="Sign Out" destructive onPress={confirmSignOut} />
+          </View>
+        </View>
+
+        <View style={{ height: 32 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: '#f8fafc' },
-  header:       { paddingTop: 50, paddingBottom: 28, alignItems: 'center', gap: 8 },
-  avatar:       { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(99,102,241,0.6)', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)' },
-  avatarText:   { color: '#fff', fontSize: 26, fontWeight: '800' },
-  name:         { fontSize: 20, fontWeight: '800', color: '#fff' },
-  phone:        { fontSize: 13, color: '#a5b4fc' },
-  verifiedPill: { backgroundColor: 'rgba(34,197,94,0.2)', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(34,197,94,0.4)' },
-  verifiedText: { color: '#4ade80', fontSize: 12, fontWeight: '700' },
-  stats:        { backgroundColor: '#fff', borderRadius: 16, padding: 18, flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  safe:         { flex: 1, backgroundColor: C.bg },
+  header:       { backgroundColor: C.surface, paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.border },
+  headerTitle:  { fontSize: 20, fontWeight: '800', color: C.text },
+  scroll:       { padding: 16, gap: 0 },
+  profileCard:  { backgroundColor: C.surface, borderRadius: 16, padding: 24, alignItems: 'center', gap: 6, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  avatar:       { width: 72, height: 72, borderRadius: 36, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  avatarText:   { color: '#fff', fontSize: 24, fontWeight: '800' },
+  profileName:  { fontSize: 18, fontWeight: '800', color: C.text },
+  profilePhone: { fontSize: 14, color: C.textSub },
+  kycBadge:     { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.successLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, marginTop: 4 },
+  kycText:      { fontSize: 12, fontWeight: '700', color: C.success },
+  statsCard:    { backgroundColor: C.surface, borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center', marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
   stat:         { flex: 1, alignItems: 'center', gap: 4 },
-  statVal:      { fontSize: 22, fontWeight: '800', color: '#0f172a' },
-  statLabel:    { fontSize: 11, color: '#64748b', fontWeight: '600' },
-  statDivider:  { width: 1, height: 40, backgroundColor: '#f1f5f9' },
-  section:      { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
-  row:          { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  rowKey:       { fontSize: 13, color: '#64748b' },
-  rowVal:       { fontSize: 13, fontWeight: '600', color: '#0f172a' },
-  researchCard: { backgroundColor: '#eff6ff', borderRadius: 16, padding: 16, gap: 10, borderWidth: 1, borderColor: '#bfdbfe' },
-  researchTitle:{ fontSize: 14, fontWeight: '700', color: '#1d4ed8' },
-  researchText: { fontSize: 12, color: '#1e40af', lineHeight: 18 },
-  researchTags: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  tag:          { backgroundColor: '#dbeafe', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  tagText:      { fontSize: 11, color: '#2563eb', fontWeight: '600' },
-  signOutBtn:   { backgroundColor: '#fff', borderRadius: 14, padding: 16, alignItems: 'center', borderWidth: 1.5, borderColor: '#fecaca', marginBottom: 8 },
-  signOutText:  { fontSize: 15, fontWeight: '700', color: '#dc2626' },
+  statValue:    { fontSize: 17, fontWeight: '800', color: C.text },
+  statLabel:    { fontSize: 11, color: C.textMuted, fontWeight: '500' },
+  statDivider:  { width: 1, height: 36, backgroundColor: C.border },
+  section:      { marginBottom: 12 },
+  sectionTitle: { fontSize: 12, fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8, paddingHorizontal: 4 },
+  menuCard:     { backgroundColor: C.surface, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  menuItem:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 14 },
+  menuIcon:     { width: 36, height: 36, borderRadius: 10, backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  menuIconDanger:{ backgroundColor: C.danger + '15' },
+  menuLabel:    { fontSize: 14, fontWeight: '600', color: C.text },
+  menuSub:      { fontSize: 12, color: C.textMuted, marginTop: 1 },
+  menuDivider:  { height: 1, backgroundColor: C.border, marginLeft: 66 },
 });

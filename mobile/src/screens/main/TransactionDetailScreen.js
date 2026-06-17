@@ -1,46 +1,78 @@
 import React from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  SafeAreaView, Alert, Clipboard,
+  SafeAreaView, Alert, Clipboard, StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useApi } from '../../hooks/useApi';
 import Loading from '../../components/Loading';
 
-function fmtAmount(n) {
-  return '₵' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 });
-}
-
-function fmtDate(ts) {
-  return new Date(ts).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
-}
-
-function riskStyle(score) {
-  if (score < 30) return { label: 'Low',    color: '#16a34a', bg: '#f0fdf4', dot: '#22c55e' };
-  if (score < 70) return { label: 'Medium', color: '#d97706', bg: '#fffbeb', dot: '#f59e0b' };
-  return              { label: 'High',   color: '#dc2626', bg: '#fef2f2', dot: '#ef4444' };
-}
-
-function statusStyle(s) {
-  if (s === 'completed') return { label: 'Completed', color: '#16a34a', bg: '#dcfce7' };
-  if (s === 'review')    return { label: 'Under Review', color: '#d97706', bg: '#fef3c7' };
-  return                        { label: 'Blocked',   color: '#dc2626', bg: '#fee2e2' };
-}
-
-function txEmoji(cat) {
-  return cat === 'MERCHANT' ? '🛍️' : cat === 'AGENT' ? '🏦' : '💸';
-}
+const C = {
+  primary:      '#1652F0',
+  primaryLight: '#EBF0FE',
+  success:      '#00875A',
+  successLight: '#E3F5F0',
+  warning:      '#FF8B00',
+  warningLight: '#FFF3E0',
+  danger:       '#DE350B',
+  dangerLight:  '#FFEBE6',
+  text:         '#0D1421',
+  textSub:      '#6B7280',
+  textMuted:    '#9CA3AF',
+  bg:           '#F5F7FA',
+  surface:      '#FFFFFF',
+  border:       '#E8ECEF',
+};
 
 const REASON_LABELS = {
   late_night:            'Late-night transaction (22:00–05:00)',
   amount_above_2000_ghs: 'Amount above GHS 2,000',
   new_recipient:         'New recipient — no prior transactions',
-  amount_3x_avg:         'Amount 3× rolling average',
+  amount_3x_avg:         'Amount 3× your rolling average',
   rapid_succession:      'Multiple transactions in quick succession',
   recipient_flagged:     'Recipient flagged in recent alerts',
+  amount_3x_rolling_avg: 'Amount exceeds 3× rolling average',
 };
+
+function fmtMoney(n) {
+  return '₵' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 });
+}
+
+function fmtDateTime(ts) {
+  return new Date(ts).toLocaleString('en-US', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+}
+
+function riskStyle(score) {
+  if (score < 30) return { label: 'Low',    color: C.success, bg: C.successLight };
+  if (score < 70) return { label: 'Medium', color: C.warning, bg: C.warningLight };
+  return              { label: 'High',   color: C.danger,  bg: C.dangerLight  };
+}
+
+function statusStyle(s) {
+  if (s === 'completed') return { label: 'Completed',    color: C.success, bg: C.successLight, icon: 'checkmark-circle' };
+  if (s === 'review')    return { label: 'Under Review', color: C.warning, bg: C.warningLight, icon: 'time' };
+  return                        { label: 'Blocked',      color: C.danger,  bg: C.dangerLight,  icon: 'close-circle' };
+}
+
+function categoryIcon(cat) {
+  if (cat === 'MERCHANT') return 'storefront-outline';
+  if (cat === 'AGENT')    return 'business-outline';
+  return 'swap-horizontal-outline';
+}
+
+function Row({ label, value, mono, valueColor }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowKey}>{label}</Text>
+      <Text style={[styles.rowVal, mono && styles.rowMono, valueColor && { color: valueColor }]}>
+        {value}
+      </Text>
+    </View>
+  );
+}
 
 export default function TransactionDetailScreen({ route, navigation }) {
   const { id } = route.params;
@@ -55,12 +87,12 @@ export default function TransactionDetailScreen({ route, navigation }) {
   if (loading || !txn) {
     return (
       <SafeAreaView style={styles.safe}>
-        <LinearGradient colors={['#1e3a8a', '#4338ca']} style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-            <Text style={styles.backText}>← Back</Text>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color={C.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Transaction Detail</Text>
-        </LinearGradient>
+        </View>
         <Loading />
       </SafeAreaView>
     );
@@ -72,142 +104,161 @@ export default function TransactionDetailScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <LinearGradient colors={['#1e3a8a', '#4338ca']} style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Text style={styles.backText}>← Back</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
+
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={22} color={C.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Transaction Detail</Text>
-        <Text style={styles.txRef}>{txn.reference}</Text>
-      </LinearGradient>
+        <View style={{ width: 38 }} />
+      </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }} showsVerticalScrollIndicator={false}>
-        {/* Amount card */}
-        <View style={styles.amountCard}>
-          <Text style={styles.emojiLarge}>{txEmoji(txn.category)}</Text>
-          <Text style={styles.amount}>−{fmtAmount(txn.amount)}</Text>
-          <Text style={styles.name}>{txn.recipient_phone}</Text>
-          <Text style={styles.time}>{fmtDate(txn.created_at)}</Text>
-          <View style={[styles.statusPill, { backgroundColor: status.bg }]}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* Amount hero */}
+        <View style={styles.hero}>
+          <View style={styles.heroIcon}>
+            <Ionicons name={categoryIcon(txn.category)} size={28} color={C.primary} />
+          </View>
+          <Text style={styles.heroAmount}>−{fmtMoney(txn.amount)}</Text>
+          <Text style={styles.heroRecipient}>{txn.recipient_phone}</Text>
+          <Text style={styles.heroDate}>{fmtDateTime(txn.created_at)}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
+            <Ionicons name={status.icon} size={14} color={status.color} />
             <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
           </View>
         </View>
 
-        {/* AI analysis */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🤖 AI Risk Analysis</Text>
+        {/* Risk analysis */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Risk Analysis</Text>
           <View style={[styles.riskRow, { backgroundColor: risk.bg }]}>
-            <View style={[styles.dot, { backgroundColor: risk.dot }]} />
-            <Text style={[styles.riskScore, { color: risk.color }]}>
-              Risk Score: {txn.risk_score}% — {risk.label}
-            </Text>
+            <View style={styles.riskLeft}>
+              <Text style={[styles.riskScore, { color: risk.color }]}>{txn.risk_score}%</Text>
+              <Text style={[styles.riskLabel, { color: risk.color }]}>{risk.label} Risk</Text>
+            </View>
+            <View style={styles.riskBar}>
+              <View style={[styles.riskFill, { width: `${txn.risk_score}%`, backgroundColor: risk.color }]} />
+            </View>
           </View>
           {reasons.length > 0 ? (
-            <View style={styles.flagCard}>
-              <Text style={styles.flagTitle}>⚠️ Risk Factors</Text>
+            <View style={styles.flagBox}>
+              <View style={styles.flagHeader}>
+                <Ionicons name="warning" size={14} color={C.warning} />
+                <Text style={styles.flagTitle}>Risk factors detected</Text>
+              </View>
               {reasons.map(r => (
-                <Text key={r} style={styles.flagReason}>• {REASON_LABELS[r] ?? r}</Text>
+                <View key={r} style={styles.flagItem}>
+                  <View style={styles.flagDot} />
+                  <Text style={styles.flagText}>{REASON_LABELS[r] ?? r}</Text>
+                </View>
               ))}
             </View>
           ) : (
-            <Text style={styles.clearText}>✅ No anomalies detected by AI model</Text>
+            <View style={styles.clearRow}>
+              <Ionicons name="checkmark-circle" size={16} color={C.success} />
+              <Text style={styles.clearText}>No anomalies detected</Text>
+            </View>
           )}
         </View>
 
         {/* Transaction details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Transaction Details</Text>
-          <View style={styles.detailTable}>
-            {[
-              { k: 'Category',  v: txn.category },
-              { k: 'Status',    v: status.label },
-              { k: 'Recipient', v: txn.recipient_phone },
-              { k: 'Date',      v: fmtDate(txn.created_at) },
-            ].map(({ k, v }) => (
-              <View key={k} style={styles.detailRow}>
-                <Text style={styles.detailKey}>{k}</Text>
-                <Text style={styles.detailVal}>{v}</Text>
-              </View>
-            ))}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Details</Text>
+          <View style={styles.table}>
+            <Row label="Reference"  value={txn.reference}          mono />
+            <Row label="Category"   value={txn.category} />
+            <Row label="Status"     value={status.label}           valueColor={status.color} />
+            <Row label="Recipient"  value={txn.recipient_phone} />
+            <Row label="Date"       value={fmtDateTime(txn.created_at)} />
+            <Row label="AI Flagged" value={txn.ai_flagged ? 'Yes' : 'No'} valueColor={txn.ai_flagged ? C.danger : C.success} />
           </View>
         </View>
 
         {/* Blockchain */}
-        <View style={[styles.section, styles.blockchainCard]}>
-          <View style={styles.blockchainHeader}>
-            <Text style={styles.sectionTitle}>🔗 Blockchain Audit Trail</Text>
-            {txn.blockchain_hash && (
-              <View style={styles.verifiedBadge}>
-                <Text style={styles.verifiedText}>✓ Verified</Text>
-              </View>
-            )}
+        <View style={[styles.card, styles.chainCard]}>
+          <View style={styles.chainHeader}>
+            <View style={styles.chainTitleRow}>
+              <Ionicons name="link" size={16} color={C.success} />
+              <Text style={styles.cardTitle}>Blockchain Record</Text>
+            </View>
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="shield-checkmark" size={12} color={C.success} />
+              <Text style={styles.verifiedText}>Verified</Text>
+            </View>
           </View>
 
           {txn.blockchain_hash ? (
             <>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailKey}>Hash</Text>
-                <Text style={[styles.detailVal, { fontFamily: 'monospace', color: '#4338ca', fontSize: 11 }]}>
-                  {txn.blockchain_hash.slice(0, 16)}…{txn.blockchain_hash.slice(-8)}
-                </Text>
+              <View style={styles.hashBox}>
+                <Text style={styles.hashLabel}>SHA-256 Hash</Text>
+                <Text style={styles.hashValue} numberOfLines={2}>{txn.blockchain_hash}</Text>
               </View>
-              <TouchableOpacity style={styles.copyBtn} onPress={copyHash}>
-                <Text style={styles.copyBtnText}>📋 Copy Full Hash</Text>
+              <TouchableOpacity style={styles.copyBtn} onPress={copyHash} activeOpacity={0.7}>
+                <Ionicons name="copy-outline" size={16} color={C.success} />
+                <Text style={styles.copyBtnText}>Copy Hash</Text>
               </TouchableOpacity>
             </>
           ) : (
-            <Text style={styles.hashPending}>Blockchain entry pending…</Text>
+            <Text style={styles.hashPending}>Blockchain entry pending</Text>
           )}
 
-          <View style={styles.detailRow}>
-            <Text style={styles.detailKey}>Immutable</Text>
-            <Text style={styles.detailVal}>Yes — cannot be altered</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailKey}>Network</Text>
-            <Text style={styles.detailVal}>Telecel Permissioned Chain</Text>
-          </View>
-          <Text style={styles.blockchainNote}>
-            This transaction is permanently recorded on an immutable blockchain ledger for dispute resolution and fraud forensics.
+          <Text style={styles.chainNote}>
+            This transaction is permanently recorded and cannot be altered.
           </Text>
         </View>
+
+        <View style={{ height: 32 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe:             { flex: 1, backgroundColor: '#f8fafc' },
-  header:           { paddingTop: 50, paddingBottom: 20, paddingHorizontal: 20, gap: 4 },
-  back:             { alignSelf: 'flex-start', marginBottom: 6 },
-  backText:         { color: '#a5b4fc', fontSize: 14 },
-  headerTitle:      { fontSize: 20, fontWeight: '800', color: '#fff' },
-  txRef:            { fontSize: 12, color: '#a5b4fc', fontFamily: 'monospace' },
-  amountCard:       { backgroundColor: '#fff', borderRadius: 20, padding: 24, alignItems: 'center', gap: 6, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
-  emojiLarge:       { fontSize: 44 },
-  amount:           { fontSize: 34, fontWeight: '800', color: '#0f172a' },
-  name:             { fontSize: 16, fontWeight: '700', color: '#0f172a' },
-  time:             { fontSize: 12, color: '#94a3b8' },
-  statusPill:       { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 999, marginTop: 4 },
-  statusText:       { fontSize: 13, fontWeight: '700' },
-  section:          { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  sectionTitle:     { fontSize: 15, fontWeight: '700', color: '#0f172a' },
-  riskRow:          { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10 },
-  dot:              { width: 10, height: 10, borderRadius: 5 },
-  riskScore:        { fontSize: 14, fontWeight: '700' },
-  flagCard:         { backgroundColor: '#fffbeb', borderRadius: 10, padding: 12, gap: 4, borderWidth: 1, borderColor: '#fde68a' },
-  flagTitle:        { fontSize: 13, fontWeight: '700', color: '#d97706' },
-  flagReason:       { fontSize: 12, color: '#92400e', lineHeight: 18 },
-  clearText:        { fontSize: 13, color: '#16a34a', fontWeight: '600' },
-  detailTable:      { gap: 8 },
-  detailRow:        { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#f8fafc' },
-  detailKey:        { fontSize: 13, color: '#64748b' },
-  detailVal:        { fontSize: 13, fontWeight: '600', color: '#0f172a', textAlign: 'right', flex: 1, marginLeft: 12 },
-  blockchainCard:   { borderWidth: 1, borderColor: '#bbf7d0', backgroundColor: '#f0fdf4' },
-  blockchainHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  verifiedBadge:    { backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  verifiedText:     { fontSize: 12, fontWeight: '700', color: '#16a34a' },
-  copyBtn:          { backgroundColor: '#fff', borderRadius: 10, padding: 10, alignItems: 'center', borderWidth: 1, borderColor: '#bbf7d0' },
-  copyBtnText:      { fontSize: 13, fontWeight: '600', color: '#059669' },
-  hashPending:      { fontSize: 12, color: '#94a3b8' },
-  blockchainNote:   { fontSize: 12, color: '#166534', lineHeight: 18, marginTop: 4 },
+  safe:         { flex: 1, backgroundColor: C.bg },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.surface, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  backBtn:      { width: 38, height: 38, borderRadius: 10, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:  { fontSize: 16, fontWeight: '700', color: C.text },
+  scroll:       { padding: 16, gap: 12 },
+  hero:         { backgroundColor: C.surface, borderRadius: 16, padding: 24, alignItems: 'center', gap: 8, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  heroIcon:     { width: 60, height: 60, borderRadius: 18, backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  heroAmount:   { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
+  heroRecipient:{ fontSize: 15, fontWeight: '600', color: C.text },
+  heroDate:     { fontSize: 13, color: C.textSub },
+  statusBadge:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, marginTop: 4 },
+  statusText:   { fontSize: 13, fontWeight: '700' },
+  card:         { backgroundColor: C.surface, borderRadius: 16, padding: 18, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  cardTitle:    { fontSize: 14, fontWeight: '700', color: C.text },
+  riskRow:      { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, gap: 14 },
+  riskLeft:     { alignItems: 'center', gap: 2, minWidth: 48 },
+  riskScore:    { fontSize: 22, fontWeight: '800' },
+  riskLabel:    { fontSize: 11, fontWeight: '700' },
+  riskBar:      { flex: 1, height: 6, backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 3, overflow: 'hidden' },
+  riskFill:     { height: 6, borderRadius: 3 },
+  flagBox:      { backgroundColor: C.warningLight, borderRadius: 12, padding: 12, gap: 8 },
+  flagHeader:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  flagTitle:    { fontSize: 13, fontWeight: '700', color: C.warning },
+  flagItem:     { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  flagDot:      { width: 5, height: 5, borderRadius: 3, backgroundColor: C.warning, marginTop: 5, flexShrink: 0 },
+  flagText:     { fontSize: 12, color: '#92400E', flex: 1, lineHeight: 18 },
+  clearRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  clearText:    { fontSize: 13, fontWeight: '600', color: C.success },
+  table:        { gap: 2 },
+  row:          { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
+  rowKey:       { fontSize: 13, color: C.textSub },
+  rowVal:       { fontSize: 13, fontWeight: '600', color: C.text, textAlign: 'right', flex: 1, marginLeft: 16 },
+  rowMono:      { fontFamily: 'monospace', fontSize: 12 },
+  chainCard:    { borderWidth: 1, borderColor: '#BBF7D0', backgroundColor: '#F0FDF4' },
+  chainHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  chainTitleRow:{ flexDirection: 'row', alignItems: 'center', gap: 6 },
+  verifiedBadge:{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.successLight, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
+  verifiedText: { fontSize: 12, fontWeight: '700', color: C.success },
+  hashBox:      { backgroundColor: '#fff', borderRadius: 10, padding: 12, gap: 4 },
+  hashLabel:    { fontSize: 11, color: C.textSub, fontWeight: '600' },
+  hashValue:    { fontSize: 11, fontFamily: 'monospace', color: C.primary, lineHeight: 16 },
+  copyBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#fff', borderRadius: 10, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: '#BBF7D0' },
+  copyBtnText:  { fontSize: 13, fontWeight: '600', color: C.success },
+  hashPending:  { fontSize: 13, color: C.textMuted },
+  chainNote:    { fontSize: 12, color: '#166534', lineHeight: 18 },
 });

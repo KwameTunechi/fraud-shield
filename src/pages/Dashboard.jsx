@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCircle, AlertTriangle, AlertCircle, TrendingUp, Brain, Fingerprint, Link2, Clock, ShieldCheck } from 'lucide-react'
+import { Bell, CheckCircle, AlertTriangle, AlertCircle, TrendingUp, Brain, Fingerprint, Link2, Clock, ShieldCheck, Activity, Ban, BarChart2, Users } from 'lucide-react'
 import DashboardLayout from '../components/DashboardLayout'
 import Loading from '../components/Loading'
 import EmptyState from '../components/EmptyState'
@@ -35,11 +35,6 @@ const SEVERITY_STYLE = {
   low:      { bg: '#eff6ff', border: '#bfdbfe', iconBg: '#3b82f6', titleColor: '#2563eb', Icon: CheckCircle },
 }
 
-const statusCards = [
-  { Icon: Brain,       label: 'AI Detection', value: 'Active',   bg: '#faf5ff', iconGrad: ['#a855f7', '#ec4899'], valueColor: '#9333ea' },
-  { Icon: Fingerprint, label: 'MFA Enabled',  value: 'Secure',   bg: '#eff6ff', iconGrad: ['#3b82f6', '#6366f1'], valueColor: '#2563eb' },
-  { Icon: Link2,       label: 'Blockchain',   value: 'Verified', bg: '#f0fdf4', iconGrad: ['#14b8a6', '#22c55e'], valueColor: '#059669' },
-]
 
 // ─── right panel ─────────────────────────────────────────────────────────────
 
@@ -94,12 +89,53 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { admin } = useAuth()
 
-  const { data: alertData, loading: alertLoading } = useApi('/api/alerts?limit=3')
-  const { data: txData,    loading: txLoading    } = useApi('/api/transactions?limit=5')
+  const { data: alertData,   loading: alertLoading } = useApi('/api/alerts?limit=3')
+  const { data: txData,      loading: txLoading    } = useApi('/api/transactions?limit=5')
+  const { data: summaryData                        } = useApi('/api/risk/summary')
+  const { data: aiData                             } = useApi('/api/ai-config')
+  const { data: chainData                          } = useApi('/api/blockchain/verify')
 
   const alerts       = alertData?.alerts       ?? []
   const transactions = txData?.transactions    ?? []
   const liveTxns     = transactions.slice(0, 4)
+
+  const aiActive     = aiData ? Object.values(aiData).some(Boolean) : null
+  const chainOk      = chainData?.ok ?? null
+  const mfaSecure    = admin?.mfaEnabled ?? admin?.mfa_enabled ?? null
+
+  const statusCards = [
+    {
+      Icon: Brain,
+      label: 'AI Detection',
+      value: aiActive === null ? '…' : aiActive ? 'Active' : 'Disabled',
+      bg: '#faf5ff',
+      iconGrad: ['#a855f7', '#ec4899'],
+      valueColor: aiActive === false ? '#ef4444' : '#9333ea',
+    },
+    {
+      Icon: Fingerprint,
+      label: 'MFA Enabled',
+      value: mfaSecure === null ? '…' : mfaSecure ? 'Secure' : 'Not Set',
+      bg: '#eff6ff',
+      iconGrad: ['#3b82f6', '#6366f1'],
+      valueColor: mfaSecure === false ? '#ef4444' : '#2563eb',
+    },
+    {
+      Icon: Link2,
+      label: 'Blockchain',
+      value: chainOk === null ? '…' : chainOk ? 'Verified' : 'Error',
+      bg: '#f0fdf4',
+      iconGrad: ['#14b8a6', '#22c55e'],
+      valueColor: chainOk === false ? '#ef4444' : '#059669',
+    },
+  ]
+
+  const summaryCards = [
+    { Icon: Activity, label: 'Txns (24h)',   value: summaryData?.tx_24h      ?? '…', color: '#4f6ef7' },
+    { Icon: Ban,      label: 'Blocked',      value: summaryData?.blocked_24h ?? '…', color: '#ef4444' },
+    { Icon: Bell,     label: 'Open Alerts',  value: summaryData?.open_alerts ?? '…', color: '#f59e0b' },
+    { Icon: Users,    label: 'Active Users', value: summaryData?.active_users ?? '…', color: '#22c55e' },
+  ]
 
   return (
     <DashboardLayout rightPanel={<RightPanel transactions={transactions} loading={txLoading} />}>
@@ -149,6 +185,21 @@ export default function Dashboard() {
             </div>
             <div style={{ fontSize: '13px', color: '#475569', fontWeight: 500 }}>{label}</div>
             <div style={{ fontSize: '14px', fontWeight: 700, color: valueColor, marginTop: '3px' }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Summary stats */}
+      <div className="rg-4" style={{ padding: '0 24px 20px' }}>
+        {summaryCards.map(({ Icon, label, value, color }) => (
+          <div key={label} style={{ background: '#fff', borderRadius: '14px', padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon size={18} color={color} />
+            </div>
+            <div>
+              <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>{value}</div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px', fontWeight: 500 }}>{label}</div>
+            </div>
           </div>
         ))}
       </div>

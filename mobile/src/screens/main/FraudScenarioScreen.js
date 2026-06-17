@@ -1,153 +1,218 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, SafeAreaView, Animated } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import {
+  View, Text, TouchableOpacity, ScrollView, StyleSheet,
+  SafeAreaView, Animated, StatusBar,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+const C = {
+  primary:      '#1652F0',
+  primaryLight: '#EBF0FE',
+  success:      '#00875A',
+  successLight: '#E3F5F0',
+  warning:      '#FF8B00',
+  warningLight: '#FFF3E0',
+  danger:       '#DE350B',
+  dangerLight:  '#FFEBE6',
+  text:         '#0D1421',
+  textSub:      '#6B7280',
+  textMuted:    '#9CA3AF',
+  bg:           '#F5F7FA',
+  surface:      '#FFFFFF',
+  border:       '#E8ECEF',
+};
+
+const DETECTION_STEPS = {
+  sim_swap: [
+    { icon: 'alert-circle', color: C.danger,  label: 'SIM change detected on carrier network' },
+    { icon: 'shield',       color: C.warning, label: 'Account access suspended automatically' },
+    { icon: 'lock-closed',  color: C.warning, label: 'Active sessions revoked' },
+    { icon: 'mail',         color: C.primary, label: 'Re-verification SMS sent to registered contact' },
+    { icon: 'checkmark-circle', color: C.success, label: 'Fraud attempt blocked — account secured' },
+  ],
+  phishing: [
+    { icon: 'alert-circle', color: C.warning, label: 'Suspicious link clicked via external message' },
+    { icon: 'shield',       color: C.danger,  label: 'Credential harvest attempt detected by AI' },
+    { icon: 'notifications', color: C.warning, label: 'User alerted via in-app push notification' },
+    { icon: 'lock-closed',  color: C.primary, label: 'Session invalidated, forced re-authentication' },
+    { icon: 'checkmark-circle', color: C.success, label: 'Incident logged to blockchain audit trail' },
+  ],
+  account_takeover: [
+    { icon: 'alert-circle', color: C.warning, label: '3 consecutive failed PIN attempts flagged' },
+    { icon: 'lock-closed',  color: C.danger,  label: 'Account locked after 5 failures' },
+    { icon: 'analytics',    color: C.primary, label: 'AI risk engine raised user risk score' },
+    { icon: 'mail',         color: C.warning, label: 'Unlock OTP sent to verified phone number' },
+    { icon: 'checkmark-circle', color: C.success, label: 'Attack mitigated — admin alerted via dashboard' },
+  ],
+  unusual_amount: [
+    { icon: 'trending-up',  color: C.warning, label: 'Transaction amount 10× rolling 30-day average' },
+    { icon: 'analytics',    color: C.primary, label: 'AI risk engine scored transaction 87/100' },
+    { icon: 'time',         color: C.warning, label: 'Transaction queued for manual review' },
+    { icon: 'notifications', color: C.primary, label: 'Customer notified — confirm or cancel' },
+    { icon: 'checkmark-circle', color: C.success, label: 'Transaction approved after confirmation' },
+  ],
+};
 
 export default function FraudScenarioScreen({ route, navigation }) {
   const { scenario } = route.params;
-  const [runningStep, setRunningStep] = useState(-1);
-  const [done, setDone] = useState(false);
-  const [started, setStarted] = useState(false);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const steps = DETECTION_STEPS[scenario.id] ?? [];
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [done,         setDone]         = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  const colorMap = { C: C.danger, H: C.warning, M: C.primary, L: C.success };
+  const sevColor = scenario.severity === 'critical' ? C.danger
+                 : scenario.severity === 'high'     ? C.warning
+                 : C.primary;
+  const sevBg    = scenario.severity === 'critical' ? C.dangerLight
+                 : scenario.severity === 'high'     ? C.warningLight
+                 : C.primaryLight;
 
   useEffect(() => {
-    if (!started) return;
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.06, duration: 600, useNativeDriver: false }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: false }),
-      ])
-    ).start();
-
-    let step = 0;
-    const interval = setInterval(() => {
-      if (step < scenario.steps.length) {
-        setRunningStep(step);
-        step++;
-      } else {
-        clearInterval(interval);
+    let i = 0;
+    const timer = setInterval(() => {
+      i++;
+      setVisibleCount(i);
+      if (i >= steps.length) {
+        clearInterval(timer);
         setDone(true);
-        pulseAnim.stopAnimation();
       }
-    }, 1200);
-    return () => clearInterval(interval);
-  }, [started]);
-
-  const isBlocked = scenario.outcome === 'blocked';
-  const outcomeColor = isBlocked ? '#dc2626' : '#d97706';
-  const outcomeBg = isBlocked ? '#fef2f2' : '#fffbeb';
+    }, 900);
+    return () => clearInterval(timer);
+  }, [steps.length]);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <LinearGradient colors={['#1e3a8a', '#4338ca']} style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Text style={styles.backText}>← Back</Text>
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={20} color={C.text} />
         </TouchableOpacity>
-        <Text style={styles.icon}>{scenario.icon}</Text>
-        <Text style={styles.headerTitle}>{scenario.title}</Text>
-        <View style={[styles.severityBadge, { backgroundColor: scenario.color + '33' }]}>
-          <Text style={[styles.severityText, { color: scenario.color }]}>{scenario.severity.toUpperCase()} SEVERITY</Text>
+        <Text style={styles.headerTitle}>Scenario Simulation</Text>
+        <View style={{ width: 38 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+        {/* Scenario header */}
+        <View style={styles.scenarioHeader}>
+          <View style={[styles.scenarioIcon, { backgroundColor: scenario.bg ?? sevBg }]}>
+            <Ionicons name={scenario.icon} size={28} color={scenario.color ?? sevColor} />
+          </View>
+          <Text style={styles.scenarioTitle}>{scenario.title}</Text>
+          <View style={[styles.severityBadge, { backgroundColor: sevBg }]}>
+            <Text style={[styles.severityText, { color: sevColor }]}>{scenario.severity?.toUpperCase()}</Text>
+          </View>
+          <Text style={styles.scenarioDesc}>{scenario.description}</Text>
         </View>
-      </LinearGradient>
 
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 20 }} showsVerticalScrollIndicator={false}>
-        <View style={[styles.descCard, { backgroundColor: scenario.bgColor, borderColor: scenario.borderColor }]}>
-          <Text style={styles.descText}>{scenario.description}</Text>
-        </View>
+        {/* Detection timeline */}
+        <View style={styles.card}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="shield-checkmark" size={16} color={C.primary} />
+            <Text style={styles.cardTitle}>FraudShield Response</Text>
+          </View>
+          <Text style={styles.cardSub}>AI detection + automated response in real time</Text>
 
-        {!started && (
-          <TouchableOpacity onPress={() => setStarted(true)}>
-            <LinearGradient colors={[scenario.color, scenario.color + 'cc']} style={styles.startBtn}>
-              <Text style={styles.startBtnText}>▶  Run Simulation</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-
-        {started && (
-          <View style={styles.stepsSection}>
-            <Text style={styles.stepsTitle}>🔁 Simulation in Progress</Text>
-            {scenario.steps.map((s, i) => {
-              const revealed = i <= runningStep;
-              const active = i === runningStep && !done;
-              return (
-                <Animated.View key={i} style={[styles.step, revealed && styles.stepRevealed, { transform: active ? [{ scale: pulseAnim }] : [] }]}>
-                  <View style={[styles.stepNum, revealed && styles.stepNumActive]}>
-                    <Text style={[styles.stepNumText, revealed && styles.stepNumTextActive]}>
-                      {revealed ? (i < runningStep || done ? '✓' : '…') : i + 1}
-                    </Text>
+          <View style={styles.timeline}>
+            {steps.map((step, i) => (
+              <View key={i} style={[styles.step, i >= visibleCount && { opacity: 0.15 }]}>
+                <View style={styles.stepLeft}>
+                  <View style={[styles.stepDot, { backgroundColor: step.color }]}>
+                    <Ionicons name={step.icon} size={14} color="#fff" />
                   </View>
-                  <Text style={[styles.stepText, revealed && styles.stepTextActive]}>{s}</Text>
-                </Animated.View>
-              );
-            })}
+                  {i < steps.length - 1 && <View style={styles.stepLine} />}
+                </View>
+                <View style={styles.stepBody}>
+                  <Text style={styles.stepLabel}>{step.label}</Text>
+                  {i < visibleCount && (
+                    <View style={[styles.stepDone, { backgroundColor: step.color + '18' }]}>
+                      <Text style={[styles.stepDoneText, { color: step.color }]}>
+                        {i === steps.length - 1 ? 'Resolved' : 'Detected'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Outcome card */}
+        {done && (
+          <View style={styles.outcomeCard}>
+            <View style={styles.outcomeIcon}>
+              <Ionicons name="shield-checkmark" size={28} color={C.success} />
+            </View>
+            <Text style={styles.outcomeTitle}>Threat Neutralised</Text>
+            <Text style={styles.outcomeSub}>
+              The system detected and blocked this fraud attempt automatically.
+              All events are permanently recorded on the blockchain audit trail.
+            </Text>
           </View>
         )}
 
-        {done && (
-          <View style={[styles.outcomeCard, { backgroundColor: outcomeBg, borderColor: scenario.borderColor }]}>
-            <Text style={styles.outcomeIcon}>{isBlocked ? '🛡️' : '🔍'}</Text>
-            <Text style={[styles.outcomeTitle, { color: outcomeColor }]}>{scenario.outcome_text}</Text>
-            <Text style={styles.outcomeDesc}>
-              {isBlocked
-                ? 'The FraudShield AI + MFA system detected and blocked this attack before any funds were compromised. An incident report has been logged to the blockchain ledger.'
-                : 'The AI model flagged this as a high-probability fraud attempt. The user was warned and the suspicious activity was logged to the immutable blockchain audit trail.'}
-            </Text>
-            <View style={styles.outcomeStats}>
-              <View style={styles.stat}>
-                <Text style={styles.statVal}>🤖</Text>
-                <Text style={styles.statLabel}>AI Detected</Text>
+        {/* System info */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>How FraudShield Protects You</Text>
+          {[
+            { icon: 'analytics-outline', label: 'AI Risk Engine',    desc: 'Scores every transaction 0–100 in milliseconds' },
+            { icon: 'link-outline',      label: 'Blockchain Ledger', desc: 'Immutable audit trail — every event recorded' },
+            { icon: 'lock-closed-outline', label: 'Multi-factor Auth', desc: 'PIN + OTP ensures only you access your account' },
+          ].map((item, i, arr) => (
+            <React.Fragment key={item.label}>
+              <View style={styles.infoRow}>
+                <View style={styles.infoIcon}>
+                  <Ionicons name={item.icon} size={18} color={C.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.infoLabel}>{item.label}</Text>
+                  <Text style={styles.infoDesc}>{item.desc}</Text>
+                </View>
               </View>
-              <View style={styles.stat}>
-                <Text style={styles.statVal}>🔗</Text>
-                <Text style={styles.statLabel}>Blockchain Logged</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statVal}>📊</Text>
-                <Text style={styles.statLabel}>Admin Alerted</Text>
-              </View>
-            </View>
-            <TouchableOpacity onPress={() => navigation.goBack()}>
-              <LinearGradient colors={['#4338ca', '#0d9488']} style={styles.doneBtn}>
-                <Text style={styles.doneBtnText}>Back to Security Centre</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        )}
+              {i < arr.length - 1 && <View style={styles.divider} />}
+            </React.Fragment>
+          ))}
+        </View>
+
+        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { paddingTop: 50, paddingBottom: 24, paddingHorizontal: 20, alignItems: 'center', gap: 8 },
-  back: { alignSelf: 'flex-start', marginBottom: 4 },
-  backText: { color: '#a5b4fc', fontSize: 14 },
-  icon: { fontSize: 48 },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#fff', textAlign: 'center' },
-  severityBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 },
-  severityText: { fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  descCard: { borderRadius: 14, padding: 16, borderWidth: 1.5 },
-  descText: { fontSize: 14, color: '#374151', lineHeight: 21 },
-  startBtn: { borderRadius: 14, paddingVertical: 18, alignItems: 'center' },
-  startBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  stepsSection: { gap: 10 },
-  stepsTitle: { fontSize: 14, fontWeight: '700', color: '#0f172a' },
-  step: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', backgroundColor: '#f8fafc', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#e2e8f0', opacity: 0.4 },
-  stepRevealed: { opacity: 1, borderColor: '#4338ca', backgroundColor: '#eff6ff' },
-  stepNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 },
-  stepNumActive: { backgroundColor: '#4338ca' },
-  stepNumText: { fontSize: 12, fontWeight: '700', color: '#64748b' },
-  stepNumTextActive: { color: '#fff' },
-  stepText: { flex: 1, fontSize: 13, color: '#94a3b8', lineHeight: 19 },
-  stepTextActive: { color: '#1e3a8a', fontWeight: '600' },
-  outcomeCard: { borderRadius: 18, padding: 20, alignItems: 'center', gap: 14, borderWidth: 1.5 },
-  outcomeIcon: { fontSize: 52 },
-  outcomeTitle: { fontSize: 20, fontWeight: '800', textAlign: 'center' },
-  outcomeDesc: { fontSize: 13, color: '#374151', textAlign: 'center', lineHeight: 20 },
-  outcomeStats: { flexDirection: 'row', gap: 20 },
-  stat: { alignItems: 'center', gap: 4 },
-  statVal: { fontSize: 24 },
-  statLabel: { fontSize: 11, color: '#64748b', fontWeight: '600', textAlign: 'center' },
-  doneBtn: { borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28 },
-  doneBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  safe:          { flex: 1, backgroundColor: C.bg },
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: C.surface, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border },
+  backBtn:       { width: 38, height: 38, borderRadius: 10, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  headerTitle:   { fontSize: 16, fontWeight: '700', color: C.text },
+  scroll:        { padding: 16, gap: 12 },
+  scenarioHeader:{ backgroundColor: C.surface, borderRadius: 16, padding: 24, alignItems: 'center', gap: 8, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  scenarioIcon:  { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  scenarioTitle: { fontSize: 18, fontWeight: '800', color: C.text, textAlign: 'center' },
+  severityBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  severityText:  { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  scenarioDesc:  { fontSize: 13, color: C.textSub, textAlign: 'center', lineHeight: 20, marginTop: 4 },
+  card:          { backgroundColor: C.surface, borderRadius: 16, padding: 18, gap: 14, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
+  cardTitleRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardTitle:     { fontSize: 15, fontWeight: '700', color: C.text },
+  cardSub:       { fontSize: 12, color: C.textSub, marginTop: -8 },
+  timeline:      { gap: 0 },
+  step:          { flexDirection: 'row', gap: 14 },
+  stepLeft:      { alignItems: 'center', width: 32 },
+  stepDot:       { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  stepLine:      { width: 2, flex: 1, backgroundColor: C.border, marginVertical: 4 },
+  stepBody:      { flex: 1, paddingBottom: 18, paddingTop: 4, gap: 6 },
+  stepLabel:     { fontSize: 13, fontWeight: '600', color: C.text, lineHeight: 18 },
+  stepDone:      { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  stepDoneText:  { fontSize: 11, fontWeight: '700' },
+  outcomeCard:   { backgroundColor: C.successLight, borderRadius: 16, padding: 24, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#BBF7D0' },
+  outcomeIcon:   { width: 56, height: 56, borderRadius: 18, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: C.success, shadowOpacity: 0.2, shadowRadius: 8, elevation: 3 },
+  outcomeTitle:  { fontSize: 18, fontWeight: '800', color: C.success },
+  outcomeSub:    { fontSize: 13, color: '#166534', textAlign: 'center', lineHeight: 20 },
+  infoRow:       { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  infoIcon:      { width: 38, height: 38, borderRadius: 10, backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  infoLabel:     { fontSize: 13, fontWeight: '700', color: C.text, marginBottom: 2 },
+  infoDesc:      { fontSize: 12, color: C.textSub },
+  divider:       { height: 1, backgroundColor: C.border },
 });

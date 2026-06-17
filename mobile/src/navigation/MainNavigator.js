@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/main/HomeScreen';
 import TransactionsScreen from '../screens/main/TransactionsScreen';
 import TransactionDetailScreen from '../screens/main/TransactionDetailScreen';
@@ -15,16 +15,9 @@ const HomeStack = createNativeStackNavigator();
 const TxStack = createNativeStackNavigator();
 const SecurityStack = createNativeStackNavigator();
 
-function TabIcon({ name, focused }) {
-  const icons = { Home: '🏠', Transactions: '💳', Security: '🛡️', Profile: '👤' };
-  return (
-    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.5 }}>{icons[name]}</Text>
-    </View>
-  );
-}
+const PRIMARY = '#1652F0';
 
-function HomeStackNav({ onSignOut }) {
+function HomeStackNav() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="HomeMain" component={HomeScreen} />
@@ -56,24 +49,32 @@ export default function MainNavigator() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
-        tabBarActiveTintColor: '#4338ca',
-        tabBarInactiveTintColor: '#94a3b8',
+        tabBarActiveTintColor: PRIMARY,
+        tabBarInactiveTintColor: '#9CA3AF',
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopColor: '#f1f5f9',
+          backgroundColor: '#FFFFFF',
+          borderTopColor: '#E8ECEF',
           borderTopWidth: 1,
-          paddingBottom: 6,
-          paddingTop: 6,
-          height: 62,
+          paddingBottom: 8,
+          paddingTop: 8,
+          height: 66,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600', marginTop: 2 },
+        tabBarIcon: ({ color, size, focused }) => {
+          const icons = {
+            Home:         focused ? 'home'              : 'home-outline',
+            Transactions: focused ? 'receipt'           : 'receipt-outline',
+            Security:     focused ? 'shield-checkmark'  : 'shield-checkmark-outline',
+            Profile:      focused ? 'person'            : 'person-outline',
+          };
+          return <Ionicons name={icons[route.name]} size={22} color={color} />;
+        },
       })}
     >
-      <Tab.Screen name="Home" children={() => <HomeStackNav onSignOut={onSignOut} />} />
+      <Tab.Screen name="Home"         component={HomeStackNav} />
       <Tab.Screen name="Transactions" component={TxStackNav} />
-      <Tab.Screen name="Security" component={SecurityStackNav} />
-      <Tab.Screen name="Profile" children={() => <ProfileScreen onSignOut={onSignOut} />} />
+      <Tab.Screen name="Security"     component={SecurityStackNav} />
+      <Tab.Screen name="Profile"      component={ProfileScreen} />
     </Tab.Navigator>
   );
 }

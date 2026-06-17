@@ -1,166 +1,104 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as LocalAuthentication from 'expo-local-authentication';
+import {
+  View, Text, TouchableOpacity, StyleSheet, Animated,
+  SafeAreaView, StatusBar,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 
-export default function BiometricScreen() {
-  const { completeBiometric } = useAuth();
-  const [status,       setStatus]       = useState('idle'); // idle|scanning|success|failed|unavailable
-  const [hasBiometric, setHasBiometric] = useState(false);
-  const [confirmSkip,  setConfirmSkip]  = useState(false);
-  const pulse = useRef(new Animated.Value(1)).current;
+const C = {
+  primary:      '#1652F0',
+  primaryLight: '#EBF0FE',
+  success:      '#00875A',
+  successLight: '#E3F5F0',
+  danger:       '#DE350B',
+  dangerLight:  '#FFEBE6',
+  text:         '#0D1421',
+  textSub:      '#6B7280',
+  textMuted:    '#9CA3AF',
+  bg:           '#F5F7FA',
+  surface:      '#FFFFFF',
+  border:       '#E8ECEF',
+};
 
-  useEffect(() => {
-    (async () => {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const enrolled    = await LocalAuthentication.isEnrolledAsync();
-      setHasBiometric(hasHardware && enrolled);
-      if (!hasHardware || !enrolled) setStatus('unavailable');
-    })();
-  }, []);
+export default function BiometricScreen({ navigation }) {
+  const { loginWithBiometric, skipBiometric } = useAuth();
+  const [state,   setState]   = useState('idle'); // 'idle' | 'scanning' | 'success' | 'error'
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const loop      = useRef(null);
 
   function startPulse() {
-    Animated.loop(
+    loop.current = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.15, duration: 700, useNativeDriver: false }),
-        Animated.timing(pulse, { toValue: 1,    duration: 700, useNativeDriver: false }),
+        Animated.timing(pulseAnim, { toValue: 1.15, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 700, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    loop.current.start();
   }
 
-  async function handleBiometric() {
-    setStatus('scanning');
+  function stopPulse() {
+    loop.current?.stop();
+    pulseAnim.setValue(1);
+  }
+
+  async function handleScan() {
+    setState('scanning');
     startPulse();
     try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage:           'Verify your identity to continue',
-        fallbackLabel:           'Use PIN',
-        cancelLabel:             'Cancel',
-        disableDeviceFallback:   false,
-      });
-      if (result.success) {
-        setStatus('success');
-        pulse.stopAnimation();
-        setTimeout(() => completeBiometric(), 600);
-      } else {
-        pulse.stopAnimation();
-        setStatus('failed');
-      }
+      await loginWithBiometric();
+      stopPulse();
+      setState('success');
     } catch {
-      pulse.stopAnimation();
-      setStatus('failed');
+      stopPulse();
+      setState('error');
     }
   }
 
-  const icons    = { idle: '👆', scanning: '🔍', success: '✅', failed: '❌', unavailable: '⚠️' };
-  const messages = {
-    idle:        'Touch the sensor to verify your identity',
-    scanning:    'Scanning…',
-    success:     'Identity verified!',
-    failed:      'Verification failed. Try again.',
-    unavailable: 'Biometrics not available on this device',
-  };
-
-  const isActionable = status === 'idle' || status === 'failed' || status === 'unavailable';
+  const iconName  = state === 'success' ? 'checkmark-circle' : state === 'error' ? 'close-circle' : 'finger-print';
+  const iconColor = state === 'success' ? C.success : state === 'error' ? C.danger : C.primary;
+  const ringColor = state === 'success' ? C.successLight : state === 'error' ? C.dangerLight : C.primaryLight;
 
   return (
-    <View style={styles.container}>
-      <LinearGradient colors={['#1e3a8a', '#4338ca']} style={styles.header}>
-        <Text style={styles.headerIcon}>🔒</Text>
-        <Text style={styles.headerTitle}>Biometric Verification</Text>
-        <Text style={styles.headerSub}>Final security layer — MFA</Text>
-      </LinearGradient>
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.surface} />
 
       <View style={styles.body}>
-        <View style={styles.card}>
-          <Animated.View style={[
-            styles.circle,
-            { transform: [{ scale: pulse }] },
-            status === 'success' && { backgroundColor: '#dcfce7', borderColor: '#22c55e' },
-            status === 'failed'  && { backgroundColor: '#fee2e2', borderColor: '#ef4444' },
-          ]}>
-            <Text style={styles.circleIcon}>{icons[status]}</Text>
+        <Text style={styles.title}>Quick Sign In</Text>
+        <Text style={styles.subtitle}>Use biometric authentication to sign in instantly.</Text>
+
+        <TouchableOpacity onPress={state === 'idle' || state === 'error' ? handleScan : undefined} activeOpacity={0.8}>
+          <Animated.View style={[styles.ring, { backgroundColor: ringColor, transform: [{ scale: pulseAnim }] }]}>
+            <Ionicons name={iconName} size={56} color={iconColor} />
           </Animated.View>
+        </TouchableOpacity>
 
-          <Text style={styles.message}>{messages[status]}</Text>
+        <Text style={styles.hint}>
+          {state === 'idle'     ? 'Tap the icon to begin'              : ''}
+          {state === 'scanning' ? 'Scanning…'                          : ''}
+          {state === 'success'  ? 'Identity confirmed'                 : ''}
+          {state === 'error'    ? 'Not recognised — try again'         : ''}
+        </Text>
 
-          {isActionable && (
-            <TouchableOpacity style={styles.btn} onPress={
-              status === 'unavailable' ? completeBiometric : handleBiometric
-            }>
-              <LinearGradient colors={['#4338ca', '#0d9488']} style={styles.btnGrad}>
-                <Text style={styles.btnText}>
-                  {status === 'unavailable' ? '🔐 Continue without biometrics' : '👆 Authenticate'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-
-          {/* Skip option for supported devices */}
-          {status !== 'success' && status !== 'unavailable' && (
-            confirmSkip ? (
-              <View style={styles.skipConfirm}>
-                <Text style={styles.skipConfirmText}>Skip biometric and continue?</Text>
-                <View style={styles.skipRow}>
-                  <TouchableOpacity onPress={() => setConfirmSkip(false)} style={styles.skipCancelBtn}>
-                    <Text style={styles.skipCancelText}>Go back</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={completeBiometric} style={styles.skipConfirmBtn}>
-                    <Text style={styles.skipConfirmBtnText}>Yes, skip</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity onPress={() => setConfirmSkip(true)}>
-                <Text style={styles.skip}>Skip for now</Text>
-              </TouchableOpacity>
-            )
-          )}
-        </View>
-
-        {/* 3-layer security summary */}
-        <View style={styles.layers}>
-          <Text style={styles.layersTitle}>Your 3-Layer Security</Text>
-          {['OTP Verification', 'PIN Authentication', 'Biometric Authentication'].map((label, i) => (
-            <View key={i} style={styles.layerRow}>
-              <Text style={styles.layerCheck}>
-                {i < 2 ? '✅' : status === 'success' ? '✅' : '⏳'}
-              </Text>
-              <Text style={styles.layerText}>{label}</Text>
-            </View>
-          ))}
-        </View>
+        <TouchableOpacity
+          style={styles.skipBtn}
+          onPress={skipBiometric ?? (() => navigation.replace('Main'))}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.skipText}>Skip for now</Text>
+        </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container:       { flex: 1, backgroundColor: '#f8fafc' },
-  header:          { paddingTop: 60, paddingBottom: 36, alignItems: 'center', gap: 6 },
-  headerIcon:      { fontSize: 36 },
-  headerTitle:     { fontSize: 24, fontWeight: '800', color: '#fff' },
-  headerSub:       { fontSize: 13, color: '#a5b4fc' },
-  body:            { flex: 1, padding: 20, gap: 16 },
-  card:            { backgroundColor: '#fff', borderRadius: 20, padding: 28, alignItems: 'center', gap: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
-  circle:          { width: 110, height: 110, borderRadius: 55, backgroundColor: '#eff6ff', borderWidth: 3, borderColor: '#4338ca', alignItems: 'center', justifyContent: 'center' },
-  circleIcon:      { fontSize: 52 },
-  message:         { fontSize: 15, fontWeight: '600', color: '#374151', textAlign: 'center' },
-  btn:             { borderRadius: 14, overflow: 'hidden', width: '100%' },
-  btnGrad:         { paddingVertical: 15, alignItems: 'center' },
-  btnText:         { color: '#fff', fontSize: 15, fontWeight: '700' },
-  skip:            { color: '#94a3b8', fontSize: 13, fontWeight: '500' },
-  skipConfirm:     { alignItems: 'center', gap: 10 },
-  skipConfirmText: { fontSize: 13, color: '#64748b', fontWeight: '600' },
-  skipRow:         { flexDirection: 'row', gap: 10 },
-  skipCancelBtn:   { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0' },
-  skipCancelText:  { fontSize: 13, color: '#64748b', fontWeight: '600' },
-  skipConfirmBtn:  { paddingVertical: 8, paddingHorizontal: 18, borderRadius: 10, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca' },
-  skipConfirmBtnText: { fontSize: 13, color: '#dc2626', fontWeight: '600' },
-  layers:          { backgroundColor: '#fff', borderRadius: 16, padding: 18, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },
-  layersTitle:     { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 4 },
-  layerRow:        { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  layerCheck:      { fontSize: 16 },
-  layerText:       { fontSize: 14, color: '#374151', fontWeight: '500' },
+  safe:     { flex: 1, backgroundColor: C.surface },
+  body:     { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 24 },
+  title:    { fontSize: 24, fontWeight: '800', color: C.text, textAlign: 'center' },
+  subtitle: { fontSize: 15, color: C.textSub, textAlign: 'center', lineHeight: 22, marginTop: -10 },
+  ring:     { width: 140, height: 140, borderRadius: 70, alignItems: 'center', justifyContent: 'center' },
+  hint:     { fontSize: 14, color: C.textSub, textAlign: 'center', minHeight: 20 },
+  skipBtn:  { paddingVertical: 10, paddingHorizontal: 24 },
+  skipText: { fontSize: 14, fontWeight: '600', color: C.textMuted },
 });
