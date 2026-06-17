@@ -32,8 +32,12 @@ const REASON_LABELS = {
   amount_3x_avg:         'Amount 3× your rolling average',
   amount_3x_rolling_avg: 'Amount exceeds 3× rolling average',
   rapid_succession:      'Multiple transactions in quick succession',
-  recipient_flagged:     'Recipient flagged in recent alerts',
+  recipient_flagged:     'Recipient account has been flagged',
 };
+
+const HIGH_RISK_REASONS = new Set([
+  'recipient_flagged', 'rapid_succession', 'amount_above_2000_ghs',
+]);
 
 function fmtMoney(n) {
   return '₵' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 });
@@ -51,23 +55,39 @@ function riskInfo(score) {
   return              { label: 'High Risk',   color: C.danger,  bg: C.dangerLight  };
 }
 
+// Determines whether this transaction needs biometric MFA.
+// Returns a reason string (non-empty = biometric required).
+function biometricReason(score, reasons, amount) {
+  if (score >= 70) return 'High fraud risk score detected';
+  if (amount >= 1000) return 'Large transfer (GHS 1,000+) requires identity verification';
+  if (reasons.some(r => HIGH_RISK_REASONS.has(r))) return 'Suspicious pattern detected';
+  if (score >= 50 && amount >= 300) return 'Elevated risk on this transfer';
+  return '';
+}
+
 const QUICK_AMOUNTS = ['50', '100', '200', '500'];
 
 export default function SendMoneyScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, challengeBiometric, biometricType } = useAuth();
 
-  const [step,       setStep]       = useState(0);
-  const [phone,      setPhone]      = useState('');
-  const [amount,     setAmount]     = useState('');
-  const [note,       setNote]       = useState('');
-  const [preview,    setPreview]    = useState(null);
-  const [analyzing,  setAnalyzing]  = useState(false);
-  const [pin,        setPin]        = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [result,     setResult]     = useState(null);
+  const [step,         setStep]         = useState(0);
+  const [phone,        setPhone]        = useState('');
+  const [amount,       setAmount]       = useState('');
+  const [note,         setNote]         = useState('');
+  const [preview,      setPreview]      = useState(null);
+  const [analyzing,    setAnalyzing]    = useState(false);
+  const [pin,          setPin]          = useState('');
+  const [submitting,   setSubmitting]   = useState(false);
+  const [result,       setResult]       = useState(null);
+  const [bioChallenging, setBioChallenging] = useState(false);
 
+  const num  = parseFloat(amount) || 0;
+  const risk = preview ? riskInfo(preview.score) : null;
+  const bioReason = preview ? biometricReason(preview.score, preview.reasons, num) : '';
+  const needsBio  = !!bioReason;
+
+  // ── Step 0 → preview ─────────────────────────────────────────────────────
   async function handleAnalyse() {
-    const num = parseFloat(amount);
     if (!num || num <= 0) { Alert.alert('Invalid Amount', 'Please enter a valid amount.'); return; }
     if (user?.balance && num > Number(user.balance)) {
       Alert.alert('Insufficient Balance', `Your balance is ${fmtMoney(user.balance)}.`); return;
@@ -88,13 +108,34 @@ export default function SendMoneyScreen({ navigation }) {
     }
   }
 
+  // ── Risk check → biometric (if needed) → PIN ─────────────────────────────
+  async function handleContinueFromRisk() {
+    if (!needsBio) { setStep(2); return; }
+
+    // Adaptive MFA: trigger biometric based on risk context
+    setBioChallenging(true);
+    try {
+      await challengeBiometric(
+        biometricType === 'face'
+          ? `Face scan required — ${bioReason}`
+          : `Fingerprint required — ${bioReason}`
+      );
+      setStep(2);
+    } catch (err) {
+      Alert.alert('Verification Failed', err.message ?? 'Could not verify identity.');
+    } finally {
+      setBioChallenging(false);
+    }
+  }
+
+  // ── PIN confirm → send ────────────────────────────────────────────────────
   async function handleSend() {
     if (pin.length < 4) return;
     setSubmitting(true);
     try {
       const { transaction } = await api.post('/api/transactions', {
         recipientPhone: normalizePhone(phone),
-        amount: parseFloat(amount),
+        amount: num,
         pin,
         category: 'P2P',
         note,
@@ -112,9 +153,6 @@ export default function SendMoneyScreen({ navigation }) {
     setStep(0); setPhone(''); setAmount(''); setNote('');
     setPreview(null); setPin(''); setResult(null);
   }
-
-  const risk = preview ? riskInfo(preview.score) : null;
-  const num  = parseFloat(amount) || 0;
 
   const stepLabels = ['Send to', 'Risk Check', 'Confirm', 'Done'];
 
@@ -156,8 +194,7 @@ export default function SendMoneyScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-
-        {/* Step 0: Recipient + amount */}
+        {/* ── STEP 0: Recipient + amount ─────────────────────────────────── */}
         {step === 0 && (
           <>
             <View style={styles.field}>
@@ -190,9 +227,7 @@ export default function SendMoneyScreen({ navigation }) {
                   placeholderTextColor={C.textMuted}
                 />
               </View>
-              <Text style={styles.balanceHint}>
-                Available: {fmtMoney(user?.balance ?? 0)}
-              </Text>
+              <Text style={styles.balanceHint}>Available: {fmtMoney(user?.balance ?? 0)}</Text>
               <View style={styles.quickRow}>
                 {QUICK_AMOUNTS.map(a => (
                   <TouchableOpacity
@@ -230,7 +265,7 @@ export default function SendMoneyScreen({ navigation }) {
           </>
         )}
 
-        {/* Step 1: Risk check result */}
+        {/* ── STEP 1: Risk check ─────────────────────────────────────────── */}
         {step === 1 && (
           <>
             <View style={styles.summaryPill}>
@@ -249,16 +284,18 @@ export default function SendMoneyScreen({ navigation }) {
               </View>
             ) : preview && (
               <>
+                {/* Risk score */}
                 <View style={[styles.riskCard, { backgroundColor: risk.bg }]}>
                   <Text style={[styles.riskScore, { color: risk.color }]}>{preview.score}%</Text>
                   <Text style={[styles.riskLabel, { color: risk.color }]}>{risk.label}</Text>
                 </View>
 
+                {/* Risk factors */}
                 {preview.reasons.length > 0 ? (
                   <View style={styles.flagCard}>
                     <View style={styles.flagHeader}>
                       <Ionicons name="warning" size={16} color={C.warning} />
-                      <Text style={styles.flagTitle}>Risk factors detected</Text>
+                      <Text style={styles.flagTitle}>Anomalies detected</Text>
                     </View>
                     {preview.reasons.map(r => (
                       <View key={r} style={styles.flagItem}>
@@ -267,6 +304,17 @@ export default function SendMoneyScreen({ navigation }) {
                       </View>
                     ))}
                   </View>
+                ) : num >= 1000 ? (
+                  <View style={styles.flagCard}>
+                    <View style={styles.flagHeader}>
+                      <Ionicons name="information-circle" size={16} color={C.warning} />
+                      <Text style={styles.flagTitle}>Large transfer</Text>
+                    </View>
+                    <View style={styles.flagItem}>
+                      <View style={styles.flagDot} />
+                      <Text style={styles.flagText}>Transfers of GHS 1,000 or more require identity verification</Text>
+                    </View>
+                  </View>
                 ) : (
                   <View style={styles.clearCard}>
                     <Ionicons name="shield-checkmark" size={20} color={C.success} />
@@ -274,22 +322,68 @@ export default function SendMoneyScreen({ navigation }) {
                   </View>
                 )}
 
+                {/* Adaptive MFA banner — shown when biometric will be required */}
+                {needsBio && (
+                  <View style={styles.mfaBanner}>
+                    <View style={styles.mfaBannerLeft}>
+                      <Ionicons
+                        name={biometricType === 'face' ? 'scan' : 'finger-print'}
+                        size={22}
+                        color={preview.score >= 70 ? C.danger : C.warning}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.mfaTitle, { color: preview.score >= 70 ? C.danger : C.warning }]}>
+                          {biometricType === 'face' ? 'Face Scan Required' : 'Fingerprint Required'}
+                        </Text>
+                        <Text style={styles.mfaDesc}>{bioReason}</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Continue / Verify button */}
                 <TouchableOpacity
-                  style={[styles.primaryBtn, preview.score >= 80 && styles.dangerBtn]}
-                  onPress={() => setStep(2)}
+                  style={[
+                    styles.primaryBtn,
+                    preview.score >= 70 && !needsBio && styles.dangerBtn,
+                    needsBio && (preview.score >= 70 ? styles.dangerBtn : styles.warningBtn),
+                    bioChallenging && styles.primaryBtnDisabled,
+                  ]}
+                  onPress={handleContinueFromRisk}
+                  disabled={bioChallenging}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.primaryBtnText}>
-                    {preview.score >= 80 ? 'Proceed (High Risk)' : 'Continue to Confirm'}
-                  </Text>
-                  <Ionicons name="arrow-forward" size={18} color="#fff" />
+                  {bioChallenging ? (
+                    <>
+                      <Ionicons name={biometricType === 'face' ? 'scan' : 'finger-print'} size={18} color="#fff" />
+                      <Text style={styles.primaryBtnText}>Verifying…</Text>
+                    </>
+                  ) : needsBio ? (
+                    <>
+                      <Ionicons name={biometricType === 'face' ? 'scan' : 'finger-print'} size={18} color="#fff" />
+                      <Text style={styles.primaryBtnText}>
+                        {biometricType === 'face' ? 'Scan Face to Continue' : 'Scan Fingerprint to Continue'}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.primaryBtnText}>Continue to Confirm</Text>
+                      <Ionicons name="arrow-forward" size={18} color="#fff" />
+                    </>
+                  )}
                 </TouchableOpacity>
+
+                {needsBio && (
+                  <Text style={styles.mfaNote}>
+                    Identity verification is required for this transaction due to its risk profile.
+                  </Text>
+                )}
               </>
             )}
           </>
         )}
 
-        {/* Step 2: PIN confirm */}
+        {/* ── STEP 2: PIN confirm ────────────────────────────────────────── */}
         {step === 2 && (
           <>
             <View style={styles.confirmCard}>
@@ -312,6 +406,16 @@ export default function SendMoneyScreen({ navigation }) {
                 <Text style={[styles.confirmVal, { color: risk?.color }]}>{preview?.score ?? 0}% — {risk?.label}</Text>
               </View>
             </View>
+
+            {/* MFA verified badge — show if biometric was challenged */}
+            {needsBio && (
+              <View style={styles.verifiedBadge}>
+                <Ionicons name="shield-checkmark" size={15} color={C.success} />
+                <Text style={styles.verifiedText}>
+                  Identity verified with {biometricType === 'face' ? 'Face ID' : 'Fingerprint'}
+                </Text>
+              </View>
+            )}
 
             <Text style={styles.pinLabel}>Enter your 4-digit PIN</Text>
             <View style={styles.pinDots}>
@@ -354,7 +458,7 @@ export default function SendMoneyScreen({ navigation }) {
           </>
         )}
 
-        {/* Step 3: Result */}
+        {/* ── STEP 3: Result ─────────────────────────────────────────────── */}
         {step === 3 && result && (
           <View style={styles.resultBox}>
             <View style={[styles.resultIcon, {
@@ -379,7 +483,7 @@ export default function SendMoneyScreen({ navigation }) {
                 ? 'This transaction was blocked due to high fraud risk.'
                 : result.status === 'review'
                 ? 'Our team is reviewing this transaction. You will be notified.'
-                : `${fmtMoney(result.amount)} sent successfully to ${result.recipient_phone}.`}
+                : `${fmtMoney(result.amount)} sent to ${result.recipient_phone}.`}
             </Text>
 
             <View style={styles.refCard}>
@@ -417,7 +521,7 @@ const styles = StyleSheet.create({
   backBtn:           { width: 38, height: 38, borderRadius: 10, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   headerTitle:       { fontSize: 15, fontWeight: '700', color: C.text },
   headerSub:         { fontSize: 12, color: C.textSub, marginTop: 1 },
-  steps:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, backgroundColor: C.surface, gap: 0, borderBottomWidth: 1, borderBottomColor: C.border },
+  steps:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border },
   stepDot:           { width: 10, height: 10, borderRadius: 5, backgroundColor: C.border },
   stepDotActive:     { backgroundColor: C.primary },
   stepLine:          { width: 48, height: 2, backgroundColor: C.border },
@@ -443,6 +547,7 @@ const styles = StyleSheet.create({
   primaryBtnDisabled:{ opacity: 0.4 },
   primaryBtnText:    { color: '#fff', fontSize: 16, fontWeight: '700' },
   dangerBtn:         { backgroundColor: C.danger },
+  warningBtn:        { backgroundColor: C.warning },
   summaryPill:       { backgroundColor: C.primaryLight, borderRadius: 12, padding: 14, alignItems: 'center' },
   summaryText:       { fontSize: 14, fontWeight: '600', color: C.primary },
   analyzingBox:      { backgroundColor: C.surface, borderRadius: 16, padding: 32, alignItems: 'center', gap: 12 },
@@ -460,10 +565,19 @@ const styles = StyleSheet.create({
   flagText:          { fontSize: 12, color: '#92400E', flex: 1, lineHeight: 18 },
   clearCard:         { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.successLight, borderRadius: 14, padding: 14 },
   clearText:         { fontSize: 14, fontWeight: '600', color: C.success },
-  confirmCard:       { backgroundColor: C.surface, borderRadius: 14, padding: 18, gap: 0, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
+  // Adaptive MFA banner
+  mfaBanner:         { borderRadius: 14, padding: 14, backgroundColor: C.dangerLight, borderWidth: 1, borderColor: C.danger + '30' },
+  mfaBannerLeft:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  mfaTitle:          { fontSize: 13, fontWeight: '800' },
+  mfaDesc:           { fontSize: 12, color: C.textSub, marginTop: 2, lineHeight: 16 },
+  mfaNote:           { fontSize: 12, color: C.textMuted, textAlign: 'center', lineHeight: 18 },
+  // Step 2
+  confirmCard:       { backgroundColor: C.surface, borderRadius: 14, padding: 18, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 },
   confirmRow:        { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border },
   confirmKey:        { fontSize: 13, color: C.textSub },
   confirmVal:        { fontSize: 13, fontWeight: '600', color: C.text, textAlign: 'right', flex: 1, marginLeft: 16 },
+  verifiedBadge:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.successLight, borderRadius: 10, padding: 10, justifyContent: 'center' },
+  verifiedText:      { fontSize: 13, fontWeight: '700', color: C.success },
   pinLabel:          { fontSize: 14, fontWeight: '700', color: C.text, textAlign: 'center' },
   pinDots:           { flexDirection: 'row', justifyContent: 'center', gap: 18 },
   pinDot:            { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: C.border },
@@ -471,6 +585,7 @@ const styles = StyleSheet.create({
   numpad:            { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
   numKey:            { width: 76, height: 76, borderRadius: 38, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
   numKeyText:        { fontSize: 22, fontWeight: '500', color: C.text },
+  // Result
   resultBox:         { alignItems: 'center', gap: 16, paddingVertical: 20 },
   resultIcon:        { width: 100, height: 100, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
   resultTitle:       { fontSize: 22, fontWeight: '800', color: C.text, textAlign: 'center' },

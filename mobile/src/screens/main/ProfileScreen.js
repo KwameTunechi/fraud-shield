@@ -40,7 +40,7 @@ function MenuItem({ icon, label, sublabel, onPress, destructive, rightIcon }) {
   );
 }
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const { user, signOut } = useAuth();
   const { data: txData    } = useApi('/api/transactions?limit=100');
   const { data: alertData } = useApi('/api/alerts?limit=100');
@@ -104,11 +104,14 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <View style={styles.menuCard}>
-            <MenuItem icon="person-outline"          label="Personal Information" sublabel="Name, phone number" onPress={() => {}} />
+            <MenuItem icon="person-outline"          label="Personal Information" sublabel="Name, phone number"
+              onPress={() => Alert.alert('Personal Information', `Name: ${user?.fullName ?? '—'}\nPhone: ${user?.phone ?? '—'}`)} />
             <View style={styles.menuDivider} />
-            <MenuItem icon="card-outline"            label="Payment Methods"      sublabel="Linked accounts"   onPress={() => {}} />
+            <MenuItem icon="card-outline"            label="Payment Methods"      sublabel="Linked accounts"
+              onPress={() => Alert.alert('Payment Methods', 'Telecel Cash account is your default payment method.')} />
             <View style={styles.menuDivider} />
-            <MenuItem icon="document-text-outline"   label="Transaction History"  sublabel={`${txCount} transactions`} onPress={() => {}} />
+            <MenuItem icon="document-text-outline"   label="Transaction History"  sublabel={`${txCount} transactions`}
+              onPress={() => navigation.navigate('Transactions')} />
           </View>
         </View>
 
@@ -116,11 +119,14 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Security</Text>
           <View style={styles.menuCard}>
-            <MenuItem icon="keypad-outline"          label="Change PIN"           onPress={() => {}} />
+            <MenuItem icon="keypad-outline"          label="Change PIN"
+              onPress={() => Alert.alert('Change PIN', 'Sign out and sign back in to set a new PIN using "Forgot PIN / New Device".', [{ text: 'OK' }])} />
             <View style={styles.menuDivider} />
-            <MenuItem icon="finger-print-outline"    label="Biometric Login"      sublabel={user?.mfaEnabled ? 'Enabled' : 'Disabled'} onPress={() => {}} />
+            <MenuItem icon="finger-print-outline"    label="Biometric Login"      sublabel={user?.mfaEnabled ? 'Enabled' : 'Tap to enable'}
+              onPress={() => Alert.alert('Biometric Login', 'Face ID / fingerprint login is set up automatically on next sign-in.')} />
             <View style={styles.menuDivider} />
-            <MenuItem icon="notifications-outline"   label="Notifications"        onPress={() => {}} />
+            <MenuItem icon="notifications-outline"   label="Notifications"
+              onPress={() => Alert.alert('Notifications', 'Push notifications are enabled for fraud alerts and transaction updates.')} />
           </View>
         </View>
 
@@ -128,9 +134,11 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Support</Text>
           <View style={styles.menuCard}>
-            <MenuItem icon="help-circle-outline"     label="Help & Support"       onPress={() => {}} />
+            <MenuItem icon="help-circle-outline"     label="Help & Support"
+              onPress={() => Alert.alert('Help & Support', 'Email: support@fraudshield.app\nPhone: +233 30 000 0000\n\nAvailable Mon–Fri, 8am–6pm GMT')} />
             <View style={styles.menuDivider} />
-            <MenuItem icon="information-circle-outline" label="About FraudShield" sublabel="Version 1.0.0"   onPress={() => {}} />
+            <MenuItem icon="information-circle-outline" label="About FraudShield" sublabel="Version 1.0.0"
+              onPress={() => Alert.alert('FraudShield', 'Version 1.0.0\nBuilt with AI-powered fraud detection.\n\n© 2026 FraudShield Ghana')} />
           </View>
         </View>
 

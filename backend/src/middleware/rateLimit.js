@@ -7,6 +7,8 @@ import { redis } from '../db/redis.js';
 // across multiple server instances.
 export function rateLimit({ keyPrefix, max, windowSec, getKey }) {
   return async (req, res, next) => {
+    if (process.env.NODE_ENV !== 'production') return next();
+
     const id = getKey(req);
     if (!id) return next();
 

@@ -58,6 +58,7 @@ export default function SetPinScreen({ navigation }) {
     setLoading(true);
     try {
       await savePin(pin);
+      navigation.replace('Biometric');
     } catch (err) {
       setError(err.message ?? 'Could not set PIN. Please try again.');
     } finally {

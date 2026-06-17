@@ -57,7 +57,12 @@ export default function OTPScreen({ navigation, route }) {
     setLoading(true);
     setError('');
     try {
-      await verifyOtp(phone, code);
+      const result = await verifyOtp(phone, code);
+      if (result.pinSetup === false) {
+        navigation.replace('SetPin');
+      } else {
+        navigation.replace('Biometric');
+      }
     } catch (err) {
       setError(err.message ?? 'Invalid code. Please try again.');
       setOtp(Array(OTP_LENGTH).fill(''));

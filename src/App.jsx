@@ -14,6 +14,7 @@ import AIConfiguration from './pages/AIConfiguration'
 import BlockchainLedger from './pages/BlockchainLedger'
 import SystemSettings from './pages/SystemSettings'
 import Administrators from './pages/Administrators'
+import CustomerProfile from './pages/CustomerProfile'
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
           <Route path="/dashboard/alerts" element={<PrivateRoute><AlertsIncidents /></PrivateRoute>} />
           <Route path="/dashboard/transactions" element={<PrivateRoute><LiveTransactions /></PrivateRoute>} />
           <Route path="/dashboard/customers" element={<PrivateRoute><CustomerDirectory /></PrivateRoute>} />
+          <Route path="/dashboard/customers/:id" element={<PrivateRoute><CustomerProfile /></PrivateRoute>} />
           <Route path="/dashboard/ai-config" element={<PrivateRoute><AIConfiguration /></PrivateRoute>} />
           <Route path="/dashboard/blockchain" element={<PrivateRoute><BlockchainLedger /></PrivateRoute>} />
           <Route path="/dashboard/settings" element={<PrivateRoute><SystemSettings /></PrivateRoute>} />

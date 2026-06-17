@@ -1,19 +1,38 @@
 // mobile/src/context/AuthContext.js
 import React, { createContext, useContext, useEffect, useState } from 'react'
+import * as SecureStore from 'expo-secure-store'
+import * as LocalAuthentication from 'expo-local-authentication'
 import { api, tokens } from '../api/client'
 import { API_URL } from '../config'
+
+const REMEMBERED_PHONE_KEY = 'fs_remembered_phone'
+const STORED_PIN_KEY        = 'fs_stored_pin'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user,        setUser]        = useState(null)
-  const [pendingUser, setPendingUser] = useState(null) // set after OTP/PIN, cleared after biometric
-  const [loading,     setLoading]     = useState(true)
+  const [user,            setUser]            = useState(null)
+  const [pendingUser,     setPendingUser]      = useState(null)
+  const [rememberedPhone, setRememberedPhone]  = useState(null)
+  const [biometricType,   setBiometricType]   = useState(null) // 'fingerprint' | 'face' | null
+  const [loading,         setLoading]          = useState(true)
 
-  // On app start: try to restore the session from the saved refresh token.
-  // If it works, the user goes straight to the main app — no biometric needed.
   useEffect(() => {
     async function restore() {
+      // Load remembered phone
+      const stored = await SecureStore.getItemAsync(REMEMBERED_PHONE_KEY)
+      if (stored) setRememberedPhone(stored)
+
+      // Check biometric hardware
+      const hasHW     = await LocalAuthentication.hasHardwareAsync()
+      const enrolled  = await LocalAuthentication.isEnrolledAsync()
+      if (hasHW && enrolled) {
+        const types = await LocalAuthentication.supportedAuthenticationTypesAsync()
+        const hasFace = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
+        setBiometricType(hasFace ? 'face' : 'fingerprint')
+      }
+
+      // Try to restore existing session
       const refresh = await tokens.loadRefresh()
       if (!refresh) { setLoading(false); return }
       try {
@@ -44,39 +63,117 @@ export function AuthProvider({ children }) {
     restore()
   }, [])
 
+  async function saveRememberedPhone(phone) {
+    await SecureStore.setItemAsync(REMEMBERED_PHONE_KEY, phone)
+    setRememberedPhone(phone)
+  }
+
+  async function clearRememberedPhone() {
+    await SecureStore.deleteItemAsync(REMEMBERED_PHONE_KEY)
+    await SecureStore.deleteItemAsync(STORED_PIN_KEY)
+    setRememberedPhone(null)
+  }
+
   // Step 1: request OTP via SMS
   async function requestOtp(phone) {
     return api.post('/api/auth/customer/request-otp', { phone })
   }
 
-  // Step 2a: verify OTP — stores tokens + pendingUser, does NOT set user yet.
-  // The caller should navigate to SetPin (if pinSetup === true) then Biometric.
+  // Step 2a: verify OTP
   async function verifyOtp(phone, code) {
     const result = await api.post('/api/auth/customer/verify-otp', { phone, code })
     tokens.setAccess(result.accessToken)
     await tokens.saveRefresh(result.refreshToken)
     setPendingUser(result.user)
-    return result // caller checks result.pinSetup
+    await saveRememberedPhone(phone)
+    return result
   }
 
-  // Step 2b: PIN-only sign-in for returning users who skip OTP
+  // Step 2b: PIN login
   async function loginWithPin(phone, pin) {
     const result = await api.post('/api/auth/customer/verify-pin', { phone, pin })
     tokens.setAccess(result.accessToken)
     await tokens.saveRefresh(result.refreshToken)
     setPendingUser(result.user)
+    await saveRememberedPhone(phone)
+    // Store PIN so biometric can use it for future logins
+    await SecureStore.setItemAsync(STORED_PIN_KEY, pin)
     return result
   }
 
-  // Step 3: set PIN for newly registered users (after OTP verification)
+  // Step 3: set PIN for new users
   async function setPin(pin) {
     await api.post('/api/auth/customer/set-pin', { pin })
-    // Update pendingUser so pinSetup flag is cleared
     if (pendingUser) setPendingUser({ ...pendingUser, pinSetup: false })
+    // Store PIN for future biometric use
+    const phone = await SecureStore.getItemAsync(REMEMBERED_PHONE_KEY)
+    if (phone) await SecureStore.setItemAsync(STORED_PIN_KEY, pin)
   }
 
-  // Final step: called by BiometricScreen after successful biometric check.
-  // Promotes pendingUser → user, which triggers AppNavigator to show MainNavigator.
+  // Biometric authentication.
+  // Two paths:
+  //   1. MFA path (pendingUser exists): biometric is the second factor after PIN/OTP.
+  //      Passes the OS prompt → promotes pendingUser → user.
+  //   2. Returning user path (no pendingUser): biometric gates access to the stored
+  //      credentials in SecureStore. Passes prompt → reads phone+PIN → calls API.
+  async function loginWithBiometric() {
+    const check = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Confirm your identity',
+      fallbackLabel: 'Use PIN',
+      disableDeviceFallback: false,
+    })
+    if (!check.success) {
+      throw new Error(check.error === 'user_cancel' ? 'Cancelled' : 'Biometric not recognised')
+    }
+
+    if (pendingUser) {
+      // MFA path: biometric confirmed, promote to full session
+      setUser(pendingUser)
+      setPendingUser(null)
+      return
+    }
+
+    // Returning user path: read credentials gated behind biometric
+    const phone = await SecureStore.getItemAsync(REMEMBERED_PHONE_KEY)
+    const pin   = await SecureStore.getItemAsync(STORED_PIN_KEY)
+    if (!phone || !pin) {
+      throw new Error('No stored credentials. Please sign in with your PIN first.')
+    }
+    const result = await api.post('/api/auth/customer/verify-pin', { phone, pin })
+    tokens.setAccess(result.accessToken)
+    await tokens.saveRefresh(result.refreshToken)
+    setUser({
+      id:         result.user?.id         ?? '',
+      phone:      result.user?.phone_number ?? phone,
+      fullName:   result.user?.full_name   ?? '',
+      balance:    result.user?.balance     ?? 0,
+      trustScore: result.user?.trust_score ?? 0,
+    })
+  }
+
+  function skipBiometric() {
+    if (pendingUser) { setUser(pendingUser); setPendingUser(null); }
+  }
+
+  // In-app biometric challenge — call this anywhere a sensitive action needs MFA.
+  // Returns true if verified (or if device has no biometric enrolled).
+  // Throws if user cancels or fails too many times.
+  async function challengeBiometric(promptMessage) {
+    const hasHW    = await LocalAuthentication.hasHardwareAsync()
+    const enrolled = await LocalAuthentication.isEnrolledAsync()
+    if (!hasHW || !enrolled) return true  // device can't do biometric; let through
+
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: promptMessage ?? 'Verify your identity',
+      fallbackLabel: 'Use PIN',
+      disableDeviceFallback: false,
+    })
+    if (!result.success) {
+      throw new Error(result.error === 'user_cancel' ? 'Cancelled' : 'Biometric not recognised. Try again.')
+    }
+    return true
+  }
+
   function completeBiometric() {
     setUser(pendingUser)
     setPendingUser(null)
@@ -91,13 +188,19 @@ export function AuthProvider({ children }) {
     await tokens.clearRefresh()
     setUser(null)
     setPendingUser(null)
+    // rememberedPhone and stored PIN are kept intentionally —
+    // biometric login will use them on next open
   }
 
   return (
     <AuthContext.Provider value={{
       user, pendingUser, loading,
+      rememberedPhone, clearRememberedPhone,
+      biometricType,
       requestOtp, verifyOtp, loginWithPin,
-      setPin, completeBiometric, signOut,
+      setPin, completeBiometric, loginWithBiometric, skipBiometric,
+      challengeBiometric,
+      signOut,
     }}>
       {children}
     </AuthContext.Provider>

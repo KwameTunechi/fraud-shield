@@ -87,10 +87,10 @@ export default function HomeScreen({ navigation }) {
   function onRefresh() { reloadTx(); reloadAlerts(); }
 
   const ACTIONS = [
-    { label: 'Send',    icon: 'arrow-up-outline',        onPress: () => navigation.navigate('SendMoney') },
-    { label: 'Receive', icon: 'arrow-down-outline',      onPress: () => {} },
-    { label: 'Airtime', icon: 'phone-portrait-outline',  onPress: () => {} },
-    { label: 'Pay Bill',icon: 'receipt-outline',         onPress: () => {} },
+    { label: 'Send',    icon: 'arrow-up-outline',       onPress: () => navigation.navigate('SendMoney') },
+    { label: 'Receive', icon: 'arrow-down-outline',     onPress: () => Alert.alert('Receive Money', `Share your number:\n${user?.phone ?? ''}`) },
+    { label: 'Airtime', icon: 'phone-portrait-outline', onPress: () => Alert.alert('Airtime Top-up', 'Coming soon.') },
+    { label: 'Pay Bill',icon: 'receipt-outline',        onPress: () => Alert.alert('Pay Bill', 'Coming soon.') },
   ];
 
   const initials = (user?.fullName ?? 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -109,7 +109,7 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.greeting}>Good {greeting()}</Text>
             <Text style={styles.userName}>{user?.fullName ?? 'Customer'}</Text>
           </View>
-          <TouchableOpacity style={styles.bellBtn} onPress={() => {}}>
+          <TouchableOpacity style={styles.bellBtn} onPress={() => Alert.alert('Alerts', alerts.length > 0 ? alerts.map(a => `• ${a.title}`).join('\n') : 'No new alerts.')}>
             <Ionicons name="notifications-outline" size={22} color="#fff" />
             {unreadCount > 0 && (
               <View style={styles.badge}>
@@ -201,9 +201,11 @@ export default function HomeScreen({ navigation }) {
           ) : (
             <View style={styles.txList}>
               {transactions.map((tx, i) => (
-                <View
+                <TouchableOpacity
                   key={tx.id}
                   style={[styles.txRow, i < transactions.length - 1 && styles.txRowBorder]}
+                  onPress={() => navigation.getParent()?.navigate('Transactions', { screen: 'TxDetail', params: { id: tx.id } })}
+                  activeOpacity={0.7}
                 >
                   <View style={styles.txIconBox}>
                     <Ionicons name={categoryIcon(tx.category)} size={18} color={C.primary} />
@@ -220,7 +222,7 @@ export default function HomeScreen({ navigation }) {
                       </Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}

@@ -4,7 +4,7 @@
 // Find it with: ipconfig (Windows) or ifconfig (macOS/Linux).
 // Example: http://192.168.1.50:3000
 
-const DEV_API_URL = 'http://192.168.1.100:3000' // ← change to your laptop's WiFi IP
+const DEV_API_URL = 'https://roots-normally-forward-executed.trycloudflare.com'
 
 export const API_URL = __DEV__
   ? DEV_API_URL

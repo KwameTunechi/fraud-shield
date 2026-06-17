@@ -1,6 +1,6 @@
 # FraudShield — AI-Powered Mobile Money Fraud Detection Platform
 
-A research project at the **University of Ghana** (CSIT 621 — Emerging Technologies for Business I) investigating how layered defences — AI risk scoring, blockchain audit trails, and multi-factor authentication — reduce fraud in Ghana's mobile money ecosystem.
+A research project at the **University of Ghana** investigating how layered defences — AI risk scoring, blockchain audit trails, and multi-factor authentication — reduce fraud in Ghana's mobile money ecosystem.
 
 Mobile money fraud losses in Ghana reached **GH₵14.94M in early 2025**. FraudShield combines three pillars to detect and prevent attacks in real time:
 
@@ -31,13 +31,13 @@ fraud-shield/
 │   ├── api/                    # API client (auto-refresh, circuit breaker, retry)
 │   ├── context/                # AuthContext (session restore, signIn, verifyMfa)
 │   ├── hooks/                  # useApi data-fetching hook
-│   ├── pages/                  # 11 dashboard pages, all wired to live backend
+│   ├── pages/                  # 10 dashboard pages, all wired to live backend
 │   ├── components/             # DashboardLayout, PrivateRoute, ErrorBoundary,
 │   │                           # Loading, EmptyState, Sidebar, Navbar
-│   ├── errors/                 # AppError, AuthError, NetworkError, ValidationError …
+│   ├── errors/                 # AppError, AuthError, NetworkError, ValidationError
 │   ├── schemas/                # Zod validation schemas
 │   └── utils/                  # Logger, withTimeout, withRetry, createCircuitBreaker
-└── mobile/                     # React Native + Expo SDK 56
+└── mobile/                     # React Native + Expo SDK 54
     └── src/
         ├── api/                # Fetch client with expo-secure-store token
         ├── context/            # AuthContext (OTP, PIN, biometric, session restore)
@@ -46,7 +46,7 @@ fraud-shield/
         └── screens/
             ├── auth/           # Splash, SignIn, OTP, SetPin, Biometric
             └── main/           # Home, SendMoney, Transactions, TransactionDetail,
-                                # Profile, Security, FraudScenario
+                                # Profile
 ```
 
 ---
@@ -56,7 +56,7 @@ fraud-shield/
 ### Prerequisites
 
 - Node.js ≥ 20
-- Docker Desktop
+- Docker Desktop (or a running PostgreSQL 16 + Redis 7)
 
 ### 1 — Start the backend
 
@@ -66,7 +66,7 @@ cp .env.example .env          # fill in JWT secrets (generate below)
 docker compose up -d          # start PostgreSQL + Redis
 npm install
 npm run db:migrate            # create all tables
-npm run db:seed               # insert demo admin + customer
+npm run db:seed               # insert demo admin + 12 seeded customers
 npm run dev                   # API at http://localhost:3000
 ```
 
@@ -87,14 +87,15 @@ curl http://localhost:3000/api/health
 
 ```bash
 # from repo root
+cp .env.example .env          # set VITE_API_URL=http://localhost:3000
 npm install
 npm run dev                   # http://localhost:5173
 ```
 
 **Demo admin sign-in:**
 1. `/signin` → `admin@fraudshield.test` / `Password123!`
-2. First login shows an `otpauth://` URL — paste it into any QR generator and scan with Google Authenticator, or add manually via "Enter setup key"
-3. Enter the 6-digit TOTP code → dashboard
+2. MFA code: `123456` (dev bypass — in production use Google Authenticator)
+3. Session persists across page refreshes via `localStorage`
 
 ### 3 — Run the mobile app
 
@@ -103,10 +104,10 @@ cd mobile
 npm install
 ```
 
-Edit `mobile/src/config.js` and replace the placeholder IP with your laptop's LAN IP (not `localhost` — the phone is a different device):
+Edit `mobile/src/config.js` — set `API_URL` to your machine's LAN IP (not `localhost`):
 
 ```bash
-ipconfig          # Windows — look for IPv4 under your WiFi adapter
+ipconfig          # Windows — IPv4 under your WiFi adapter
 ifconfig          # macOS / Linux
 ```
 
@@ -115,10 +116,10 @@ npx expo start    # scan QR in Expo Go on your phone
 ```
 
 **Demo customer sign-in:**
-- Enter any Ghana mobile number, e.g. `0244000001`
-- The OTP prints to the backend terminal in dev mode
-- Set a 4-digit PIN on first sign-in
-- Biometric is offered on phones that support it
+- Phone: `0244000001` (or any of the 12 seeded customers)
+- OTP prints to the backend terminal in dev mode
+- Set a 4-digit PIN on first sign-in; subsequent logins go straight to PIN screen
+- Biometric (fingerprint / Face ID) offered as a second factor on supported devices
 
 ---
 
@@ -128,12 +129,12 @@ npx expo start    # scan QR in Expo Go on your phone
 |--------|------|------|-------------|
 | GET | `/api/health` | — | DB + Redis health check |
 | POST | `/api/auth/admin/signin` | — | Email + password → pending token |
-| POST | `/api/auth/admin/verify-mfa` | — | TOTP → access token + cookie |
+| POST | `/api/auth/admin/verify-mfa` | — | TOTP → access + refresh tokens |
 | POST | `/api/auth/customer/request-otp` | — | Send OTP via SMS |
 | POST | `/api/auth/customer/verify-otp` | — | Verify OTP → tokens + `pinSetup` |
 | POST | `/api/auth/customer/set-pin` | user | Set PIN after first OTP |
 | POST | `/api/auth/customer/verify-pin` | — | PIN-only sign-in |
-| POST | `/api/auth/refresh` | — | Rotate access token |
+| POST | `/api/auth/refresh` | — | Rotate access token (cookie or body) |
 | POST | `/api/auth/signout` | — | Revoke session |
 | GET | `/api/auth/me` | any | Current user/admin profile |
 | GET | `/api/transactions` | any | Paginated list (customers see own only) |
@@ -172,6 +173,17 @@ npx expo start    # scan QR in Expo Go on your phone
 
 Triggered rules are stored in `transactions.metadata.reasons` so every decision is fully auditable.
 
+### Adaptive Biometric MFA
+
+The mobile app gates high-risk transactions behind a fingerprint/Face ID challenge before submission. The `biometricReason()` function triggers when any of:
+
+- Risk score ≥ 70 → "High fraud risk score detected"
+- Amount ≥ GHS 1,000 → "Large transfer requires identity verification"
+- Any of `recipient_flagged`, `rapid_succession`, `amount_above_2000_ghs` rules fire
+- Score ≥ 50 and amount ≥ GHS 300 → "Elevated risk on this transfer"
+
+Clean low-risk transactions proceed without a biometric challenge.
+
 ---
 
 ## Blockchain Ledger
@@ -191,19 +203,30 @@ Events logged: every transaction, every successful admin sign-in.
 
 ## Web Dashboard
 
-All 11 pages are wired to the live backend with no hardcoded mock data:
+All pages are wired to the live backend with no hardcoded mock data:
 
 | Page | Data source |
 |------|------------|
-| Dashboard | alerts + recent transactions + auth context (admin name/role) |
-| Live Transactions | `/api/transactions` + SSE stream (new rows appear without refresh) |
-| Risk Analytics | `/api/risk/analytics` byDay + byCategory → real Recharts data |
+| Dashboard | alerts + recent transactions + admin profile |
+| Live Transactions | `/api/transactions` + SSE stream (new rows appear live) |
+| Risk Analytics | `/api/risk/analytics` → Recharts byDay + byCategory charts |
 | Alerts & Incidents | `/api/alerts` with Mark Read + Resolve buttons |
 | Blockchain Ledger | `/api/blockchain` + chain integrity banner |
 | Customer Directory | `/api/customers` with 300 ms debounced search |
+| Customer Profile | per-customer transactions, alerts, trust score |
 | AI Configuration | `/api/ai-config` toggles — each flip persists to DB immediately |
-| System Settings | `/api/settings` + real admin info from auth context |
+| System Settings | `/api/settings` + live admin count + role info |
 | Administrators | `/api/admins` with role badges + last-login times |
+
+### Sidebar
+
+- Collapsible via the **×** button next to the logo; re-expands via the hamburger when collapsed
+- User avatar at the bottom shows the signed-in admin's name and role; click the logout icon to sign out
+- FraudShield logo always navigates back to `/dashboard`
+
+### Session persistence
+
+The admin refresh token is stored in `localStorage` and sent in the request body on page load. This means refreshing the page or navigating directly to any `/dashboard/*` URL restores the session without redirecting to sign-in.
 
 ---
 
@@ -212,24 +235,29 @@ All 11 pages are wired to the live backend with no hardcoded mock data:
 ### Auth flow
 
 ```
-Splash ──► SignIn (phone number)
-               │
-               ├── "Get OTP"  ──► OTPScreen ──► [SetPinScreen, first time] ──► BiometricScreen ──► Home
-               │
-               └── "Use PIN"  ──► PIN numpad ──► BiometricScreen ──► Home
+Splash
+  │
+  ├── Returning user (phone stored) ──► PIN numpad ──► BiometricScreen ──► Home
+  │       ├── "Use OTP instead"    ──► OTPScreen ──► BiometricScreen ──► Home
+  │       └── "Different account"  ──► clears stored phone → phone entry
+  │
+  └── New user ──► Phone entry ──► OTPScreen ──► [SetPinScreen, first time]
+                                ──► BiometricScreen ──► Home
 ```
 
-Refresh token stored in `expo-secure-store`. On next app open the session is restored automatically — no re-authentication.
+- Phone number and PIN are stored in `expo-secure-store` after first login
+- Subsequent logins go straight to PIN screen (or fingerprint for returning users)
+- Biometric can be used as quick login (reads stored credentials) or as post-PIN MFA
 
 ### Main screens (all real data)
 
 | Screen | What's wired |
 |--------|-------------|
-| Home | Balance + trust score from auth; recent transactions + alerts; pull-to-refresh |
-| Send Money | Step 2 calls `/api/transactions/preview` → real AI score + plain-English reasons; step 3 posts the real transaction; result shows reference + blockchain hash |
+| Home | Balance + trust score from auth; recent transactions + alerts; pull-to-refresh; tappable transaction rows |
+| Send Money | Preview calls `/api/transactions/preview` → live AI score + reasons; adaptive biometric gate for high-risk; posts real transaction with blockchain hash |
 | Transactions | Full list with status filters + pull-to-refresh |
-| Transaction Detail | Fetches by ID; shows AI reasons, blockchain hash with Copy button |
-| Profile | Real name, balance, transaction count; sign out clears secure storage |
+| Transaction Detail | AI reasons, risk score, blockchain hash with Copy button |
+| Profile | Real name, balance, transaction count; all menu items wired |
 
 ---
 
@@ -246,8 +274,6 @@ Migrations in `backend/src/db/migrations/`:
 | `blockchain_entries` | Immutable hash-chained audit log |
 | `sessions` | Refresh tokens (stored hashed, with expiry) |
 | `otp_codes` | SMS OTP records (hashed, TTL via Redis) |
-| `risk_models` | Risk model config |
-| `fraud_scenarios` | Simulator scenario definitions |
 | `settings` | AI config + system settings (JSONB key-value) |
 
 ---
@@ -283,36 +309,26 @@ GitHub Actions on every push to `main`/`develop`:
 
 ## Deployment
 
-### Production URLs
-
-**Backend API:** TBD (Railway)  
-**Web Dashboard:** TBD (Vercel)  
-**Mobile APK:** TBD (Expo EAS)
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full guide.
 
 ### Quick Deploy
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment guide.
-
 **Backend (Railway):**
-1. Connect GitHub repo
-2. Set root directory: `backend`
-3. Add PostgreSQL + Redis
-4. Set environment variables
-5. Run migrations: `npm run db:migrate`
+1. Connect GitHub repo, set root directory: `backend`
+2. Add PostgreSQL + Redis add-ons
+3. Set environment variables (see DEPLOYMENT.md)
+4. Run `npm run db:migrate` → `npm run db:seed`
 
 **Web (Vercel):**
-1. Import GitHub repo
-2. Framework: Vite
-3. Set `VITE_API_URL` to Railway URL
-4. Deploy
+1. Import GitHub repo, framework: Vite
+2. Set `VITE_API_URL` to the Railway URL
+3. Deploy
 
 **Mobile (EAS):**
 ```bash
 cd mobile
 eas build --profile preview --platform android
 ```
-
-See [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) for pre-deployment verification.
 
 ---
 
@@ -331,8 +347,9 @@ See [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) for pre-deployment veri
 | 8 | Web: all remaining pages + new backend endpoints | ✅ |
 | 9 | Mobile: auth — OTP, PIN, biometric, session restore | ✅ |
 | 10 | Mobile: Home, SendMoney, Transactions, Profile | ✅ |
-| 11 | Deploy: Railway (backend) + Vercel (web) + EAS (Android APK) | ⬜ |
-| 12 | Hardening: Sentry, Logtail, UptimeRobot, security audit | ⬜ |
+| 11 | Mobile: returning-user flow, adaptive biometric MFA, all buttons wired | ✅ |
+| 12 | Admin portal audit: all pages verified, blockchain integrity fixed, session persistence | ✅ |
+| 13 | Deploy: Railway (backend) + Vercel (web) + EAS (Android APK) | ⬜ |
 
 ---
 
@@ -341,12 +358,10 @@ See [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md) for pre-deployment veri
 | Name | Role |
 |------|------|
 | Evans Adusu | Project Lead |
-| Group 6 | CSIT 621 — University of Ghana |
+| Group 6 | University of Ghana |
 
 ---
 
 ## Research Context
 
-CSIT 621 — Emerging Technologies for Business I, University of Ghana. The platform investigates how composite security (AI + blockchain + MFA) compares to single-layer defences against SIM swap, phishing, fake reversal, and account-takeover fraud in Ghana's mobile money sector.
-
-Live URLs and APK download will be added here after Sprint 11.
+University of Ghana. The platform investigates how composite security (AI + blockchain + MFA) compares to single-layer defences against SIM swap, phishing, fake reversal, and account-takeover fraud in Ghana's mobile money sector.

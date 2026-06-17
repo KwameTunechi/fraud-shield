@@ -119,7 +119,6 @@ export default function Administrators() {
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', marginBottom: '3px' }}>Developed by Group 6</div>
-              <div style={{ fontSize: 'clamp(11px,1.5vw,13px)', fontWeight: 700, color: '#fff', marginBottom: '3px' }}>CSIT 621 - Emerging Technologies for Business I</div>
               <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)' }}>© 2026 All Rights Reserved</div>
             </div>
           </div>

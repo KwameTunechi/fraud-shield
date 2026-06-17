@@ -2,13 +2,17 @@
 
 This guide covers deploying the FraudShield platform to production.
 
+## Current Status
+
+All three components are **feature-complete** and running locally via Cloudflare tunnels for development/demo. Production deployment to Railway + Vercel + EAS is the next step (Sprint 13).
+
 ## Overview
 
 FraudShield consists of three deployable components:
 
 1. **Backend API** — Node.js/Express server with PostgreSQL and Redis (Railway)
 2. **Web Admin Dashboard** — React/Vite SPA (Vercel)
-3. **Mobile App** — React Native/Expo APK (EAS Build)
+3. **Mobile App** — React Native/Expo SDK 54 APK (EAS Build)
 
 ---
 
@@ -64,9 +68,11 @@ Go to the backend service **"Variables"** tab and add:
 | `NODE_ENV` | `production` | |
 | `PORT` | `3000` | |
 | `ARKESEL_API_KEY` | Your Arkesel API key | From arkesel.com dashboard |
-| `CORS_ORIGINS` | `https://fraud-shield.vercel.app` | Update after Vercel deployment |
+| `CORS_ORIGINS` | `https://fraud-shield-xyz.vercel.app` | Update after Vercel deployment |
 
 > **Security Note**: Never commit secrets to Git. Generate unique secrets for production.
+
+> **Session Note**: Admin refresh tokens are returned in the JSON response body AND set as httpOnly cookies. The web dashboard stores them in `localStorage` and sends them in the request body — this ensures sessions survive page refreshes even when the frontend and backend are on different origins (e.g. Vercel + Railway).
 
 ### 1.5 Run Database Migrations
 

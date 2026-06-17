@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, SafeAreaView, StatusBar,
@@ -25,14 +25,35 @@ function normalizePhone(raw) {
   return '+233' + clean;
 }
 
+function maskPhone(phone) {
+  // "+233244100001" → "+233 24•• ••• 001"
+  if (!phone) return '';
+  const local = phone.replace('+233', '');   // "244100001"
+  return '+233 ' + local.slice(0, 2) + '• •••' + local.slice(-3);
+}
+
+// Modes:
+//  'returning'  — remembered phone found, show PIN numpad directly
+//  'phone'      — no remembered phone, enter phone number
+//  'pin'        — phone entered manually, now enter PIN
 export default function SignInScreen({ navigation }) {
-  const { requestOtp, loginWithPin } = useAuth();
+  const { requestOtp, loginWithPin, skipBiometric, loginWithBiometric,
+          rememberedPhone, clearRememberedPhone, biometricType } = useAuth();
+
+  const [mode,    setMode]    = useState('phone');  // will update in useEffect
   const [phone,   setPhone]   = useState('');
   const [pin,     setPin]     = useState('');
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState('');
-  const [step,    setStep]    = useState('phone'); // 'phone' | 'pin'
 
+  // As soon as rememberedPhone is known, jump to 'returning' mode
+  useEffect(() => {
+    if (rememberedPhone) {
+      setMode('returning');
+    }
+  }, [rememberedPhone]);
+
+  // ── Phone-entry continue ────────────────────────────────────────────────
   async function handleContinue() {
     setError('');
     const normalized = normalizePhone(phone);
@@ -43,22 +64,25 @@ export default function SignInScreen({ navigation }) {
       if (res?.pinSetup === false) {
         navigation.navigate('OTP', { phone: normalized });
       } else {
-        setStep('pin');
+        setMode('pin');
       }
     } catch (err) {
-      setError(err.message ?? 'Could not send verification code.');
+      setError(err.message ?? 'Could not verify number.');
     } finally {
       setLoading(false);
     }
   }
 
+  // ── PIN login (returning user or manual phone entry) ────────────────────
   async function handlePinLogin() {
     setError('');
     if (pin.length < 4) return;
-    const normalized = normalizePhone(phone);
+    const target = mode === 'returning' ? rememberedPhone : normalizePhone(phone);
     setLoading(true);
     try {
-      await loginWithPin(normalized, pin);
+      await loginWithPin(target, pin);
+      // Navigate to biometric as MFA (BiometricScreen will promote pendingUser)
+      navigation.replace('Biometric');
     } catch (err) {
       setError(err.message ?? 'Incorrect PIN. Please try again.');
       setPin('');
@@ -67,8 +91,89 @@ export default function SignInScreen({ navigation }) {
     }
   }
 
-  function handleDigit(d) { if (pin.length < 4) setPin(p => p + d); }
-  function handleDelete()  { setPin(p => p.slice(0, -1)); }
+  // ── Biometric login for returning user (bypasses PIN) ────────────────────
+  async function handleBiometricLogin() {
+    setError('');
+    setLoading(true);
+    try {
+      await loginWithBiometric(); // returning-user path: biometric → stored PIN → API
+      // loginWithBiometric sets user directly → AppNavigator switches to main
+    } catch (err) {
+      setError(err.message ?? 'Biometric failed. Use your PIN.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── OTP for returning user ──────────────────────────────────────────────
+  async function handleOtpForReturning() {
+    setLoading(true);
+    try {
+      await requestOtp(rememberedPhone);
+      navigation.navigate('OTP', { phone: rememberedPhone });
+    } catch (err) {
+      setError(err.message ?? 'Could not send OTP.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Switch to different account ─────────────────────────────────────────
+  async function handleDifferentAccount() {
+    await clearRememberedPhone();
+    setPin('');
+    setError('');
+    setMode('phone');
+  }
+
+  function handleDigit(d) { if (pin.length < 4) setPin(p => p + d); setError(''); }
+  function handleDelete()  { setPin(p => p.slice(0, -1)); setError(''); }
+
+  // ── Shared PIN numpad ───────────────────────────────────────────────────
+  function PinNumpad({ onSubmit, submitLabel }) {
+    return (
+      <>
+        <View style={styles.pinDots}>
+          {[0, 1, 2, 3].map(i => (
+            <View key={i} style={[styles.pinDot, pin.length > i && styles.pinDotFilled]} />
+          ))}
+        </View>
+
+        {error ? (
+          <View style={styles.errorRow}>
+            <Ionicons name="alert-circle" size={14} color={C.danger} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.numpad}>
+          {['1','2','3','4','5','6','7','8','9','','0','del'].map((k, i) => (
+            <TouchableOpacity
+              key={i}
+              style={[styles.numKey, k === '' && { opacity: 0 }]}
+              onPress={() => k === 'del' ? handleDelete() : k && handleDigit(k)}
+              disabled={k === ''}
+              activeOpacity={0.7}
+            >
+              {k === 'del'
+                ? <Ionicons name="backspace-outline" size={22} color={C.text} />
+                : <Text style={styles.numKeyText}>{k}</Text>
+              }
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.primaryBtn, (pin.length < 4 || loading) && styles.primaryBtnDisabled]}
+          onPress={onSubmit}
+          disabled={pin.length < 4 || loading}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.primaryBtnText}>{loading ? 'Signing in…' : submitLabel}</Text>
+        </TouchableOpacity>
+      </>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -84,10 +189,82 @@ export default function SignInScreen({ navigation }) {
             <Text style={styles.brandTag}>Secure Mobile Money</Text>
           </View>
 
-          {step === 'phone' ? (
+          {/* ── RETURNING USER: PIN numpad, phone pre-filled ── */}
+          {mode === 'returning' && (
             <View style={styles.card}>
+              <View style={styles.accountRow}>
+                <View style={styles.accountIcon}>
+                  <Ionicons name="person" size={18} color={C.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.accountPhone}>{maskPhone(rememberedPhone)}</Text>
+                  <Text style={styles.accountLabel}>Your account</Text>
+                </View>
+              </View>
+
               <Text style={styles.cardTitle}>Welcome back</Text>
-              <Text style={styles.cardSub}>Enter your registered mobile number to continue.</Text>
+
+              {/* Biometric quick-login */}
+              {biometricType && (
+                <>
+                  <TouchableOpacity
+                    style={[styles.biometricBtn, loading && styles.primaryBtnDisabled]}
+                    onPress={handleBiometricLogin}
+                    disabled={loading}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons
+                      name={biometricType === 'face' ? 'scan' : 'finger-print'}
+                      size={26}
+                      color={C.primary}
+                    />
+                    <Text style={styles.biometricBtnText}>
+                      {loading ? 'Verifying…' : biometricType === 'face' ? 'Sign in with Face ID' : 'Sign in with Fingerprint'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {error ? (
+                    <View style={styles.errorRow}>
+                      <Ionicons name="alert-circle" size={14} color={C.danger} />
+                      <Text style={styles.errorText}>{error}</Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.dividerRow}>
+                    <View style={styles.dividerLine} />
+                    <Text style={styles.dividerText}>or use PIN</Text>
+                    <View style={styles.dividerLine} />
+                  </View>
+                </>
+              )}
+
+              {!biometricType && <Text style={styles.cardSub}>Enter your PIN to continue.</Text>}
+              {!biometricType && error ? (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={14} color={C.danger} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
+              <PinNumpad onSubmit={handlePinLogin} submitLabel="Sign In with PIN" />
+
+              <View style={styles.altLinks}>
+                <TouchableOpacity onPress={handleOtpForReturning} disabled={loading} activeOpacity={0.7}>
+                  <Text style={styles.linkText}>Use OTP instead</Text>
+                </TouchableOpacity>
+                <Text style={styles.linkDivider}>·</Text>
+                <TouchableOpacity onPress={handleDifferentAccount} activeOpacity={0.7}>
+                  <Text style={styles.linkText}>Different account</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* ── NEW USER / NO REMEMBERED PHONE: enter number ── */}
+          {mode === 'phone' && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Sign In</Text>
+              <Text style={styles.cardSub}>Enter your registered Ghana mobile number.</Text>
 
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>Mobile Number</Text>
@@ -123,57 +300,26 @@ export default function SignInScreen({ navigation }) {
                 {!loading && <Ionicons name="arrow-forward" size={18} color="#fff" />}
               </TouchableOpacity>
             </View>
-          ) : (
+          )}
+
+          {/* ── MANUAL PHONE ENTRY → PIN ── */}
+          {mode === 'pin' && (
             <View style={styles.card}>
-              <TouchableOpacity style={styles.backRow} onPress={() => { setStep('phone'); setPin(''); setError(''); }}>
+              <TouchableOpacity
+                style={styles.backRow}
+                onPress={() => { setMode('phone'); setPin(''); setError(''); }}
+              >
                 <Ionicons name="arrow-back" size={16} color={C.textSub} />
                 <Text style={styles.backText}>Change number</Text>
               </TouchableOpacity>
 
               <Text style={styles.cardTitle}>Enter your PIN</Text>
-              <Text style={styles.cardSub}>Use your 4-digit PIN to sign in.</Text>
+              <Text style={styles.cardSub}>4-digit PIN for {normalizePhone(phone) ?? phone}</Text>
 
-              <View style={styles.pinDots}>
-                {[0, 1, 2, 3].map(i => (
-                  <View key={i} style={[styles.pinDot, pin.length > i && styles.pinDotFilled]} />
-                ))}
-              </View>
-
-              {error ? (
-                <View style={styles.errorRow}>
-                  <Ionicons name="alert-circle" size={14} color={C.danger} />
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              ) : null}
-
-              <View style={styles.numpad}>
-                {['1','2','3','4','5','6','7','8','9','','0','del'].map((k, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={[styles.numKey, k === '' && { opacity: 0 }]}
-                    onPress={() => k === 'del' ? handleDelete() : k && handleDigit(k)}
-                    disabled={k === ''}
-                    activeOpacity={0.7}
-                  >
-                    {k === 'del'
-                      ? <Ionicons name="backspace-outline" size={22} color={C.text} />
-                      : <Text style={styles.numKeyText}>{k}</Text>
-                    }
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <PinNumpad onSubmit={handlePinLogin} submitLabel="Sign In" />
 
               <TouchableOpacity
-                style={[styles.primaryBtn, (pin.length < 4 || loading) && styles.primaryBtnDisabled]}
-                onPress={handlePinLogin}
-                disabled={pin.length < 4 || loading}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryBtnText}>{loading ? 'Signing in…' : 'Sign In'}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.linkRow}
+                style={styles.altLinks}
                 onPress={() => navigation.navigate('OTP', { phone: normalizePhone(phone) })}
               >
                 <Text style={styles.linkText}>Sign in with OTP instead</Text>
@@ -189,35 +335,45 @@ export default function SignInScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  safe:              { flex: 1, backgroundColor: C.bg },
-  scroll:            { flexGrow: 1, padding: 24, gap: 32, justifyContent: 'center' },
-  brand:             { alignItems: 'center', gap: 8 },
-  brandIcon:         { width: 64, height: 64, borderRadius: 20, backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  brandName:         { fontSize: 22, fontWeight: '800', color: C.text },
-  brandTag:          { fontSize: 13, color: C.textSub },
-  card:              { backgroundColor: C.surface, borderRadius: 20, padding: 24, gap: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 16, elevation: 4 },
-  cardTitle:         { fontSize: 20, fontWeight: '800', color: C.text },
-  cardSub:           { fontSize: 14, color: C.textSub, lineHeight: 20, marginTop: -8 },
-  field:             { gap: 8 },
-  fieldLabel:        { fontSize: 13, fontWeight: '600', color: C.textSub },
-  phoneRow:          { flexDirection: 'row', borderRadius: 12, borderWidth: 1.5, borderColor: C.border, overflow: 'hidden', backgroundColor: C.surface },
-  prefix:            { paddingHorizontal: 14, paddingVertical: 14, backgroundColor: C.bg, borderRightWidth: 1, borderRightColor: C.border, justifyContent: 'center' },
-  prefixText:        { fontSize: 14, fontWeight: '600', color: C.textSub },
-  phoneInput:        { flex: 1, fontSize: 16, color: C.text, paddingHorizontal: 14, paddingVertical: 14 },
-  errorRow:          { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  errorText:         { fontSize: 12, color: C.danger },
-  primaryBtn:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.primary, borderRadius: 14, paddingVertical: 16 },
-  primaryBtnDisabled:{ opacity: 0.4 },
-  primaryBtnText:    { color: '#fff', fontSize: 16, fontWeight: '700' },
-  backRow:           { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  backText:          { fontSize: 13, color: C.textSub },
-  pinDots:           { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingVertical: 8 },
-  pinDot:            { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: C.border },
-  pinDotFilled:      { backgroundColor: C.primary, borderColor: C.primary },
-  numpad:            { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
-  numKey:            { width: 72, height: 72, borderRadius: 36, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
-  numKeyText:        { fontSize: 22, fontWeight: '500', color: C.text },
-  linkRow:           { alignItems: 'center' },
-  linkText:          { fontSize: 14, color: C.primary, fontWeight: '600' },
-  footer:            { textAlign: 'center', fontSize: 12, color: C.textMuted, lineHeight: 18 },
+  safe:               { flex: 1, backgroundColor: C.bg },
+  scroll:             { flexGrow: 1, padding: 24, gap: 32, justifyContent: 'center' },
+  brand:              { alignItems: 'center', gap: 8 },
+  brandIcon:          { width: 64, height: 64, borderRadius: 20, backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  brandName:          { fontSize: 22, fontWeight: '800', color: C.text },
+  brandTag:           { fontSize: 13, color: C.textSub },
+  card:               { backgroundColor: C.surface, borderRadius: 20, padding: 24, gap: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 16, elevation: 4 },
+  cardTitle:          { fontSize: 20, fontWeight: '800', color: C.text },
+  cardSub:            { fontSize: 14, color: C.textSub, lineHeight: 20, marginTop: -8 },
+  accountRow:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.primaryLight, borderRadius: 14, padding: 14 },
+  accountIcon:        { width: 38, height: 38, borderRadius: 10, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
+  accountPhone:       { fontSize: 15, fontWeight: '700', color: C.text },
+  accountLabel:       { fontSize: 11, color: C.textSub, marginTop: 1 },
+  field:              { gap: 8 },
+  fieldLabel:         { fontSize: 13, fontWeight: '600', color: C.textSub },
+  phoneRow:           { flexDirection: 'row', borderRadius: 12, borderWidth: 1.5, borderColor: C.border, overflow: 'hidden', backgroundColor: C.surface },
+  prefix:             { paddingHorizontal: 14, paddingVertical: 14, backgroundColor: C.bg, borderRightWidth: 1, borderRightColor: C.border, justifyContent: 'center' },
+  prefixText:         { fontSize: 14, fontWeight: '600', color: C.textSub },
+  phoneInput:         { flex: 1, fontSize: 16, color: C.text, paddingHorizontal: 14, paddingVertical: 14 },
+  errorRow:           { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  errorText:          { fontSize: 12, color: C.danger },
+  primaryBtn:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: C.primary, borderRadius: 14, paddingVertical: 16 },
+  primaryBtnDisabled: { opacity: 0.4 },
+  primaryBtnText:     { color: '#fff', fontSize: 16, fontWeight: '700' },
+  backRow:            { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  backText:           { fontSize: 13, color: C.textSub },
+  pinDots:            { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingVertical: 8 },
+  pinDot:             { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: C.border },
+  pinDotFilled:       { backgroundColor: C.primary, borderColor: C.primary },
+  numpad:             { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
+  numKey:             { width: 72, height: 72, borderRadius: 36, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  numKeyText:         { fontSize: 22, fontWeight: '500', color: C.text },
+  altLinks:           { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, paddingTop: 4 },
+  linkDivider:        { fontSize: 16, color: C.textMuted },
+  linkText:           { fontSize: 14, color: C.primary, fontWeight: '600' },
+  biometricBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: C.primaryLight, borderRadius: 14, paddingVertical: 16, borderWidth: 1.5, borderColor: C.primary + '30' },
+  biometricBtnText:   { fontSize: 16, fontWeight: '700', color: C.primary },
+  dividerRow:         { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dividerLine:        { flex: 1, height: 1, backgroundColor: C.border },
+  dividerText:        { fontSize: 12, color: C.textMuted, fontWeight: '500' },
+  footer:             { textAlign: 'center', fontSize: 12, color: C.textMuted, lineHeight: 18 },
 });
