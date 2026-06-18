@@ -26,5 +26,10 @@ dist-ssr
 # Test coverage output
 coverage/
 
+# Environment variables — never commit
+.env
+.env.*
+!.env.example
+
 # Claude Code local session data
 .claude/
