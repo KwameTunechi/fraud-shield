@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import CustomerLayout from '../../components/CustomerLayout'
+import CustomerBottomNav from '../../components/CustomerBottomNav'
 import { useCustomerApi } from '../../hooks/useCustomerApi'
 import { customerApi } from '../../api/customerClient'
 
@@ -182,6 +183,7 @@ export function CustomerTransactionDetail() {
 
         <div style={{ height: '20px' }} />
       </div>
+      <CustomerBottomNav />
     </CustomerLayout>
   )
 }
@@ -231,7 +233,7 @@ export default function CustomerTransactions() {
 
   return (
     <CustomerLayout header={Header}>
-      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '90px' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px', color: C.textMuted, fontSize: '14px' }}>Loading…</div>
         ) : transactions.length === 0 ? (
@@ -276,6 +278,7 @@ export default function CustomerTransactions() {
           ))
         )}
       </div>
+      <CustomerBottomNav />
     </CustomerLayout>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CustomerLayout from '../../components/CustomerLayout'
+import CustomerBottomNav from '../../components/CustomerBottomNav'
 import { useCustomerAuth } from '../../context/CustomerAuthContext'
 import { useCustomerApi } from '../../hooks/useCustomerApi'
 
@@ -83,7 +84,7 @@ export default function CustomerHome() {
               <button onClick={handleRefresh} style={iconBtn} title="Refresh">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
               </button>
-              <button onClick={handleSignOut} style={iconBtn} title="Notifications">
+              <button onClick={() => alerts.length > 0 ? alert('Alerts:\n\n' + alerts.map(a => `• ${a.title}`).join('\n')) : alert('No new alerts.')} style={iconBtn} title="Notifications">
                 <div style={{ position: 'relative', display: 'flex' }}>
                   <span style={{ color: '#fff' }}>{ICONS.bell}</span>
                   {unread > 0 && <div style={{ position: 'absolute', top: '-2px', right: '-2px', background: '#ef4444', minWidth: '16px', height: '16px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: '800', color: '#fff', padding: '0 3px' }}>{unread}</div>}
@@ -198,12 +199,10 @@ export default function CustomerHome() {
           <div style={{ height: '16px' }} />
         </div>
 
-        <button onClick={handleSignOut}
-          style={{ margin: '8px 16px', padding: '16px', borderRadius: '14px', background: C.surface, border: `1px solid ${C.border}`, color: C.textSub, fontSize: '14px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-          ↩ Sign Out
-        </button>
+        <div style={{ height: '80px' }} />
       </div>
 
+      <CustomerBottomNav />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )

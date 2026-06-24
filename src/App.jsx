@@ -24,6 +24,8 @@ import CustomerSetPin from './pages/customer/CustomerSetPin'
 import CustomerHome from './pages/customer/CustomerHome'
 import CustomerSend from './pages/customer/CustomerSend'
 import CustomerTransactions, { CustomerTransactionDetail } from './pages/customer/CustomerTransactions'
+import CustomerSecurity from './pages/customer/CustomerSecurity'
+import CustomerProfilePage from './pages/customer/CustomerProfile'
 
 function App() {
   return (
@@ -56,6 +58,8 @@ function App() {
             <Route path="/app/send" element={<CustomerPrivateRoute><CustomerSend /></CustomerPrivateRoute>} />
             <Route path="/app/transactions" element={<CustomerPrivateRoute><CustomerTransactions /></CustomerPrivateRoute>} />
             <Route path="/app/transactions/:id" element={<CustomerPrivateRoute><CustomerTransactionDetail /></CustomerPrivateRoute>} />
+            <Route path="/app/security" element={<CustomerPrivateRoute><CustomerSecurity /></CustomerPrivateRoute>} />
+            <Route path="/app/profile" element={<CustomerPrivateRoute><CustomerProfilePage /></CustomerPrivateRoute>} />
           </Routes>
         </CustomerAuthProvider>
       </AuthProvider>

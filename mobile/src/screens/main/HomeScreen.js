@@ -144,23 +144,24 @@ export default function HomeScreen({ navigation }) {
         </View>
       </View>
 
+      {/* ── Quick actions — outside ScrollView so refresh gesture never blocks taps ── */}
+      <View style={styles.actionsRow}>
+        {ACTIONS.map(({ label, icon, onPress }) => (
+          <TouchableOpacity key={label} style={styles.action} onPress={onPress} activeOpacity={0.7}>
+            <View style={styles.actionIcon}>
+              <Ionicons name={icon} size={22} color={C.primary} />
+            </View>
+            <Text style={styles.actionLabel}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <ScrollView
         style={styles.scroll}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={txLoading || alertLoading} onRefresh={onRefresh} tintColor={C.primary} />}
       >
-        {/* ── Quick actions ───────────────────────────────────── */}
-        <View style={styles.actionsRow}>
-          {ACTIONS.map(({ label, icon, onPress }) => (
-            <TouchableOpacity key={label} style={styles.action} onPress={onPress} activeOpacity={0.7}>
-              <View style={styles.actionIcon}>
-                <Ionicons name={icon} size={22} color={C.primary} />
-              </View>
-              <Text style={styles.actionLabel}>{label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
         {/* ── Alerts ──────────────────────────────────────────── */}
         {alerts.length > 0 && (
           <View style={styles.section}>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CustomerLayout from '../../components/CustomerLayout'
+import CustomerBottomNav from '../../components/CustomerBottomNav'
 import { useCustomerAuth } from '../../context/CustomerAuthContext'
 import { customerApi } from '../../api/customerClient'
 
@@ -127,7 +128,7 @@ export default function CustomerSend() {
 
   return (
     <CustomerLayout header={Header}>
-      <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '90px' }}>
 
         {/* ── STEP 0: Form ───────────────────────────────────────────── */}
         {step === 0 && (
@@ -281,6 +282,7 @@ export default function CustomerSend() {
           </div>
         )}
       </div>
+      <CustomerBottomNav />
     </CustomerLayout>
   )
 }
