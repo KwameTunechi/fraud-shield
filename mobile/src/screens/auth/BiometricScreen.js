@@ -29,8 +29,9 @@ export default function BiometricScreen() {
   const pulseLoop  = useRef(null);
   const isFace     = biometricType === 'face';
 
-  // Auto-trigger on mount
+  // Auto-trigger on mount — skip immediately if no biometric hardware enrolled
   useEffect(() => {
+    if (!biometricType) { skipBiometric(); return; }
     const t = setTimeout(handleScan, 500);
     return () => clearTimeout(t);
   }, []);
@@ -129,7 +130,7 @@ export default function BiometricScreen() {
         {/* Skip */}
         {state !== 'success' && (
           <TouchableOpacity style={styles.skipBtn} onPress={skipBiometric} activeOpacity={0.7}>
-            <Text style={styles.skipText}>Skip for now</Text>
+            <Text style={styles.skipText}>Continue without biometric</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -148,6 +149,6 @@ const styles = StyleSheet.create({
   hint:       { fontSize: 14, color: C.textSub, textAlign: 'center', minHeight: 20 },
   retryBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
   retryText:  { fontSize: 14, fontWeight: '700', color: '#fff' },
-  skipBtn:    { paddingVertical: 10, paddingHorizontal: 24, marginTop: 8 },
-  skipText:   { fontSize: 14, fontWeight: '600', color: C.textMuted },
+  skipBtn:    { paddingVertical: 12, paddingHorizontal: 28, marginTop: 8, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.bg },
+  skipText:   { fontSize: 14, fontWeight: '600', color: C.textSub },
 });

@@ -23,7 +23,7 @@ const OTP_LENGTH = 6;
 
 export default function OTPScreen({ navigation, route }) {
   const phone = route?.params?.phone ?? '';
-  const { verifyOtp, requestOtp } = useAuth();
+  const { verifyOtp, requestOtp, skipBiometric, biometricType } = useAuth();
 
   const [otp,       setOtp]       = useState(Array(OTP_LENGTH).fill(''));
   const [loading,   setLoading]   = useState(false);
@@ -60,8 +60,11 @@ export default function OTPScreen({ navigation, route }) {
       const result = await verifyOtp(phone, code);
       if (result.pinSetup) {
         navigation.replace('SetPin');
-      } else {
+      } else if (biometricType) {
         navigation.replace('Biometric');
+      } else {
+        // No biometric on this device — promote session directly
+        skipBiometric();
       }
     } catch (err) {
       setError(err.message ?? 'Invalid code. Please try again.');

@@ -37,7 +37,7 @@ function maskPhone(phone) {
 //  'phone'      — no remembered phone, enter phone number
 //  'pin'        — phone entered manually, now enter PIN
 export default function SignInScreen({ navigation }) {
-  const { requestOtp, loginWithPin, skipBiometric, loginWithBiometric,
+  const { requestOtp, loginWithPin, completeBiometric, loginWithBiometric,
           rememberedPhone, clearRememberedPhone, biometricType } = useAuth();
 
   const [mode,    setMode]    = useState('phone');  // will update in useEffect
@@ -69,7 +69,7 @@ export default function SignInScreen({ navigation }) {
     }
   }
 
-  // ── PIN login (returning user or manual phone entry) ────────────────────
+  // ── PIN login (returning user) — PIN alone is sufficient, no biometric MFA ──
   async function handlePinLogin() {
     setError('');
     if (pin.length < 4) return;
@@ -77,8 +77,8 @@ export default function SignInScreen({ navigation }) {
     setLoading(true);
     try {
       await loginWithPin(target, pin);
-      // Navigate to biometric as MFA (BiometricScreen will promote pendingUser)
-      navigation.replace('Biometric');
+      // Promote pendingUser directly — returning users don't need biometric MFA
+      completeBiometric();
     } catch (err) {
       setError(err.message ?? 'Incorrect PIN. Please try again.');
       setPin('');
@@ -244,16 +244,17 @@ export default function SignInScreen({ navigation }) {
 
               <PinNumpad onSubmit={handlePinLogin} submitLabel="Sign In with PIN" />
 
-              <View style={styles.altLinks}>
-                <TouchableOpacity onPress={handleOtpForReturning} disabled={loading} activeOpacity={0.7}>
-                  <Text style={styles.linkText}>Use OTP instead</Text>
-                </TouchableOpacity>
-                <Text style={styles.linkDivider}>·</Text>
-                <TouchableOpacity onPress={handleDifferentAccount} activeOpacity={0.7}>
-                  <Text style={styles.linkText}>Different account</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity onPress={handleOtpForReturning} disabled={loading} activeOpacity={0.7} style={styles.otpLink}>
+                <Ionicons name="chatbubble-outline" size={14} color={C.primary} />
+                <Text style={styles.linkText}>Use OTP instead</Text>
+              </TouchableOpacity>
             </View>
+
+            {/* Different account — outside the card, clearly visible */}
+            <TouchableOpacity onPress={handleDifferentAccount} activeOpacity={0.8} style={styles.diffAccountBtn}>
+              <Ionicons name="swap-horizontal-outline" size={16} color={C.textSub} />
+              <Text style={styles.diffAccountText}>Login to a different account</Text>
+            </TouchableOpacity>
           )}
 
           {/* ── NEW USER / NO REMEMBERED PHONE: enter number ── */}
@@ -338,9 +339,10 @@ const styles = StyleSheet.create({
   numpad:             { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12 },
   numKey:             { width: 72, height: 72, borderRadius: 36, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   numKeyText:         { fontSize: 22, fontWeight: '500', color: C.text },
-  altLinks:           { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, paddingTop: 4 },
-  linkDivider:        { fontSize: 16, color: C.textMuted },
+  otpLink:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: 4 },
   linkText:           { fontSize: 14, color: C.primary, fontWeight: '600' },
+  diffAccountBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, paddingHorizontal: 20, borderRadius: 14, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
+  diffAccountText:    { fontSize: 14, fontWeight: '600', color: C.textSub },
   biometricBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: C.primaryLight, borderRadius: 14, paddingVertical: 16, borderWidth: 1.5, borderColor: C.primary + '30' },
   biometricBtnText:   { fontSize: 16, fontWeight: '700', color: C.primary },
   dividerRow:         { flexDirection: 'row', alignItems: 'center', gap: 10 },

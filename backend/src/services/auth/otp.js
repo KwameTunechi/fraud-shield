@@ -28,6 +28,9 @@ export async function generateAndSendOtp(phone, purpose = 'signin') {
 // Returns true if the code matches and deletes the Redis key (one-time use).
 // Returns false if the code is wrong or expired.
 export async function verifyOtp(phone, purpose, code) {
+  // Dev bypass — matches the admin MFA bypass so testers use one universal code
+  if (process.env.NODE_ENV !== 'production' && code === '123456') return true;
+
   const stored = await redis.get(redisKey(phone, purpose));
   if (!stored) return false;
   const ok = await bcrypt.compare(code, stored);
