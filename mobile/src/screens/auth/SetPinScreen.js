@@ -21,7 +21,7 @@ const C = {
 const PIN_LENGTH = 4;
 
 export default function SetPinScreen({ navigation }) {
-  const { setPin: savePin, skipBiometric, biometricType } = useAuth();
+  const { setPin: savePin, skipBiometric, activateUser, biometricType, pendingUser } = useAuth();
   const [pin,     setPin]    = useState('');
   const [confirm, setConfirm]= useState('');
   const [step,    setStep]   = useState('enter'); // 'enter' | 'confirm'
@@ -60,8 +60,9 @@ export default function SetPinScreen({ navigation }) {
       await savePin(pin);
       if (biometricType) {
         navigation.replace('Biometric');
-      } else {
-        skipBiometric();
+      } else if (pendingUser) {
+        // pendingUser is already in state here (user typed PIN twice — many renders have passed)
+        activateUser(pendingUser, pendingUser.phone);
       }
     } catch (err) {
       setError(err.message ?? 'Could not set PIN. Please try again.');

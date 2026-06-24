@@ -195,6 +195,21 @@ export function AuthProvider({ children }) {
     setPendingUser(null)
   }
 
+  // Promote a raw API user object to a full session without depending on
+  // pendingUser state. Use this immediately after verifyOtp / loginWithPin
+  // so the stale closure value of pendingUser doesn't cause a no-op.
+  function activateUser(raw, phone) {
+    setUser({
+      id:         raw.id,
+      phone:      raw.phone_number ?? raw.phone ?? phone ?? '',
+      fullName:   raw.full_name   ?? raw.fullName  ?? 'Customer',
+      balance:    raw.balance     ?? 0,
+      trustScore: raw.trust_score ?? raw.trustScore ?? 0,
+      mfaEnabled: raw.mfa_enabled ?? raw.mfaEnabled ?? false,
+    })
+    setPendingUser(null)
+  }
+
   async function signOut() {
     try {
       const refresh = await tokens.loadRefresh()
@@ -214,7 +229,7 @@ export function AuthProvider({ children }) {
       rememberedPhone, clearRememberedPhone,
       biometricType,
       requestOtp, verifyOtp, loginWithPin,
-      setPin, completeBiometric, loginWithBiometric, skipBiometric,
+      setPin, completeBiometric, activateUser, loginWithBiometric, skipBiometric,
       challengeBiometric,
       refreshUser,
       signOut,

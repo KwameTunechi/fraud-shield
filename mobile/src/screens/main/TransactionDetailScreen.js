@@ -124,7 +124,24 @@ export default function TransactionDetailScreen({ route, navigation }) {
             <Ionicons name={categoryIcon(txn.category)} size={28} color={C.primary} />
           </View>
           <Text style={styles.heroAmount}>−{fmtMoney(txn.amount)}</Text>
-          <Text style={styles.heroRecipient}>{txn.recipient_phone}</Text>
+
+          {/* From → To */}
+          <View style={styles.transferRow}>
+            <View style={styles.transferParty}>
+              <Text style={styles.transferLabel}>From</Text>
+              <Text style={styles.transferName} numberOfLines={1}>{txn.sender_name ?? 'You'}</Text>
+              <Text style={styles.transferPhone}>{txn.sender_phone ?? ''}</Text>
+            </View>
+            <View style={styles.transferArrow}>
+              <Ionicons name="arrow-forward" size={18} color={C.primary} />
+            </View>
+            <View style={styles.transferParty}>
+              <Text style={styles.transferLabel}>To</Text>
+              <Text style={styles.transferName} numberOfLines={1}>{txn.recipient_name ?? txn.recipient_phone}</Text>
+              <Text style={styles.transferPhone}>{txn.recipient_phone}</Text>
+            </View>
+          </View>
+
           <Text style={styles.heroDate}>{fmtDateTime(txn.created_at)}</Text>
           <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
             <Ionicons name={status.icon} size={14} color={status.color} />
@@ -172,7 +189,10 @@ export default function TransactionDetailScreen({ route, navigation }) {
             <Row label="Reference"  value={txn.reference}          mono />
             <Row label="Category"   value={txn.category} />
             <Row label="Status"     value={status.label}           valueColor={status.color} />
-            <Row label="Recipient"  value={txn.recipient_phone} />
+            <Row label="Sender"     value={txn.sender_name ?? 'You'} />
+            <Row label="From"       value={txn.sender_phone ?? ''} />
+            <Row label="Recipient"  value={txn.recipient_name ?? txn.recipient_phone} />
+            <Row label="To"         value={txn.recipient_phone} />
             <Row label="Date"       value={fmtDateTime(txn.created_at)} />
             <Row label="AI Flagged" value={txn.ai_flagged ? 'Yes' : 'No'} valueColor={txn.ai_flagged ? C.danger : C.success} />
           </View>
@@ -228,6 +248,12 @@ const styles = StyleSheet.create({
   heroAmount:   { fontSize: 30, fontWeight: '800', color: C.text, letterSpacing: -0.5 },
   heroRecipient:{ fontSize: 15, fontWeight: '600', color: C.text },
   heroDate:     { fontSize: 13, color: C.textSub },
+  transferRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.bg, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 16, marginTop: 4 },
+  transferParty:{ flex: 1, alignItems: 'center' },
+  transferLabel:{ fontSize: 11, color: C.textMuted, fontWeight: '600', textTransform: 'uppercase', marginBottom: 3 },
+  transferName: { fontSize: 13, fontWeight: '700', color: C.text, textAlign: 'center' },
+  transferPhone:{ fontSize: 11, color: C.textSub, textAlign: 'center', marginTop: 1 },
+  transferArrow:{ width: 32, height: 32, borderRadius: 16, backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center' },
   statusBadge:  { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, marginTop: 4 },
   statusText:   { fontSize: 13, fontWeight: '700' },
   card:         { backgroundColor: C.surface, borderRadius: 16, padding: 18, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, elevation: 2 },

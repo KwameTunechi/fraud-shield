@@ -182,9 +182,15 @@ router.get('/', authenticate, async (req, res) => {
 
   params.push(limit, offset);
   const sql = `
-    SELECT * FROM transactions
+    SELECT t.*,
+           s.full_name        AS sender_name,
+           s.phone_number     AS sender_phone,
+           r.full_name        AS recipient_name
+    FROM transactions t
+    LEFT JOIN users s ON s.id = t.sender_id
+    LEFT JOIN users r ON r.id = t.recipient_id
     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-    ORDER BY created_at DESC
+    ORDER BY t.created_at DESC
     LIMIT $${params.length - 1} OFFSET $${params.length}
   `;
 
@@ -196,7 +202,15 @@ router.get('/', authenticate, async (req, res) => {
 
 router.get('/:id', authenticate, async (req, res) => {
   const { rows } = await pool.query(
-    'SELECT * FROM transactions WHERE id = $1', [req.params.id]
+    `SELECT t.*,
+            s.full_name        AS sender_name,
+            s.phone_number     AS sender_phone,
+            r.full_name        AS recipient_name
+     FROM transactions t
+     LEFT JOIN users s ON s.id = t.sender_id
+     LEFT JOIN users r ON r.id = t.recipient_id
+     WHERE t.id = $1`,
+    [req.params.id]
   );
   const tx = rows[0];
   if (!tx) return res.status(404).json({ error: 'Transaction not found' });

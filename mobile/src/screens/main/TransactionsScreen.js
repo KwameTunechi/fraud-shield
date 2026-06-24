@@ -106,11 +106,15 @@ export default function TransactionsScreen({ navigation }) {
 
         <View style={styles.cardBody}>
           <View style={styles.cardTop}>
-            <Text style={styles.cardName} numberOfLines={1}>{tx.recipient_phone}</Text>
+            <Text style={styles.cardName} numberOfLines={1}>
+              {tx.recipient_name ?? tx.recipient_phone}
+            </Text>
             <Text style={styles.cardAmount}>−{fmtMoney(tx.amount)}</Text>
           </View>
           <View style={styles.cardMid}>
-            <Text style={styles.cardRef} numberOfLines={1}>{tx.reference}</Text>
+            <Text style={styles.cardRef} numberOfLines={1}>
+              {tx.sender_name ?? 'You'} → {tx.recipient_phone}
+            </Text>
             <Text style={styles.cardTime}>{fmtTime(tx.created_at)}</Text>
           </View>
           <View style={styles.cardTags}>

@@ -37,7 +37,7 @@ function maskPhone(phone) {
 //  'phone'      — no remembered phone, enter phone number
 //  'pin'        — phone entered manually, now enter PIN
 export default function SignInScreen({ navigation }) {
-  const { requestOtp, loginWithPin, completeBiometric, loginWithBiometric,
+  const { requestOtp, loginWithPin, activateUser, loginWithBiometric,
           rememberedPhone, clearRememberedPhone, biometricType } = useAuth();
 
   const [mode,    setMode]    = useState('phone');  // will update in useEffect
@@ -76,9 +76,8 @@ export default function SignInScreen({ navigation }) {
     const target = mode === 'returning' ? rememberedPhone : normalizePhone(phone);
     setLoading(true);
     try {
-      await loginWithPin(target, pin);
-      // Promote pendingUser directly — returning users don't need biometric MFA
-      completeBiometric();
+      const result = await loginWithPin(target, pin);
+      activateUser(result.user, target);
     } catch (err) {
       setError(err.message ?? 'Incorrect PIN. Please try again.');
       setPin('');
