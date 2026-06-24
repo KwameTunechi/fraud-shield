@@ -78,7 +78,7 @@ body {
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 /* Page content padding */
-.page-pad { padding: 24px 32px; }
+.page-pad { padding: 24px 32px; max-width: 960px; }
 .header-section {
   padding: 24px 32px 28px;
   border-radius: 0 0 20px 20px;

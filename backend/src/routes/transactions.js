@@ -213,16 +213,42 @@ router.put('/:id/status', authenticate, requireAdmin, async (req, res) => {
   if (!allowed.includes(req.body?.status)) {
     return res.status(400).json({ error: `Status must be one of: ${allowed.join(', ')}` });
   }
-  const { rows } = await pool.query(
-    `UPDATE transactions
-     SET status = $1, completed_at = CASE WHEN $1 = 'completed' THEN NOW() ELSE completed_at END
-     WHERE id = $2
-     RETURNING *`,
-    [req.body.status, req.params.id]
-  );
-  if (!rows[0]) return res.status(404).json({ error: 'Transaction not found' });
-  publish('transaction.status_changed', { id: rows[0].id, status: rows[0].status });
-  res.json(rows[0]);
+
+  const updated = await withTransaction(async (client) => {
+    const { rows: current } = await client.query(
+      'SELECT * FROM transactions WHERE id = $1 FOR UPDATE',
+      [req.params.id]
+    );
+    if (!current[0]) return null;
+    const tx = current[0];
+
+    // Admin rejects a review transaction → refund sender
+    if (tx.status === 'review' && req.body.status === 'blocked') {
+      await client.query(
+        'UPDATE users SET balance = balance + $1 WHERE id = $2',
+        [tx.amount, tx.sender_id]
+      );
+      if (tx.recipient_id) {
+        await client.query(
+          'UPDATE users SET balance = balance - $1 WHERE id = $2',
+          [tx.amount, tx.recipient_id]
+        );
+      }
+    }
+
+    const { rows } = await client.query(
+      `UPDATE transactions
+       SET status = $1, completed_at = CASE WHEN $1 = 'completed' THEN NOW() ELSE completed_at END
+       WHERE id = $2
+       RETURNING *`,
+      [req.body.status, req.params.id]
+    );
+    return rows[0];
+  });
+
+  if (!updated) return res.status(404).json({ error: 'Transaction not found' });
+  publish('transaction.status_changed', { id: updated.id, status: updated.status });
+  res.json(updated);
 });
 
 // ─── POST /api/transactions/preview ─────────────────────────────────────────

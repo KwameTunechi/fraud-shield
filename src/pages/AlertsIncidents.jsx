@@ -122,7 +122,12 @@ export default function AlertsIncidents() {
               const badge = statusBadge(alert)
               const { Icon } = s
               return (
-                <div key={alert.id} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: '16px', padding: '16px 18px' }}>
+                <div key={alert.id}
+                  onClick={() => navigate(`/dashboard/alerts/${alert.id}`, { state: { alert } })}
+                  style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: '16px', padding: '16px 18px', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)'}
+                  onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+                >
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: s.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -145,14 +150,14 @@ export default function AlertsIncidents() {
                       <div style={{ display: 'flex', gap: '6px' }}>
                         {!alert.read && (
                           <button
-                            onClick={() => markAsRead(alert.id)}
+                            onClick={e => { e.stopPropagation(); markAsRead(alert.id) }}
                             style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '7px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
                           >
                             Mark read
                           </button>
                         )}
                         <button
-                          onClick={() => resolve(alert.id)}
+                          onClick={e => { e.stopPropagation(); resolve(alert.id) }}
                           style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '7px', border: 'none', background: '#4f6ef7', color: '#fff', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
                         >
                           Resolve

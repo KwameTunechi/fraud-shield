@@ -8,6 +8,7 @@ import TwoFactor from './pages/TwoFactor'
 import Dashboard from './pages/Dashboard'
 import RiskAnalytics from './pages/RiskAnalytics'
 import AlertsIncidents from './pages/AlertsIncidents'
+import IncidentDetail from './pages/IncidentDetail'
 import LiveTransactions from './pages/LiveTransactions'
 import CustomerDirectory from './pages/CustomerDirectory'
 import AIConfiguration from './pages/AIConfiguration'
@@ -27,6 +28,7 @@ function App() {
           <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
           <Route path="/dashboard/risk" element={<PrivateRoute><RiskAnalytics /></PrivateRoute>} />
           <Route path="/dashboard/alerts" element={<PrivateRoute><AlertsIncidents /></PrivateRoute>} />
+          <Route path="/dashboard/alerts/:id" element={<PrivateRoute><IncidentDetail /></PrivateRoute>} />
           <Route path="/dashboard/transactions" element={<PrivateRoute><LiveTransactions /></PrivateRoute>} />
           <Route path="/dashboard/customers" element={<PrivateRoute><CustomerDirectory /></PrivateRoute>} />
           <Route path="/dashboard/customers/:id" element={<PrivateRoute><CustomerProfile /></PrivateRoute>} />
