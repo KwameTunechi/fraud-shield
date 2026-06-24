@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield } from 'lucide-react'
 import CustomerLayout from '../../components/CustomerLayout'
 import { useCustomerAuth } from '../../context/CustomerAuthContext'
 
-const P = '#1652F0'
+const C = { primary:'#1652F0', primaryLight:'#EBF0FE', danger:'#DE350B', text:'#0D1421', textSub:'#6B7280', textMuted:'#9CA3AF', bg:'#F5F7FA', surface:'#FFFFFF', border:'#E8ECEF' }
 
 function normalizePhone(raw) {
   const digits = raw.replace(/\D/g, '')
@@ -30,7 +29,7 @@ export default function CustomerSignIn() {
       await requestOtp(normalized)
       navigate('/app/otp', { state: { phone: normalized } })
     } catch (err) {
-      setError(err.message ?? 'Could not send OTP. Please try again.')
+      setError(err.message ?? 'Could not verify number.')
     } finally {
       setLoading(false)
     }
@@ -38,63 +37,54 @@ export default function CustomerSignIn() {
 
   return (
     <CustomerLayout>
-      {/* Brand */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', paddingTop: '40px', paddingBottom: '8px' }}>
-        <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: P, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Shield size={30} color="#fff" />
-        </div>
-        <div style={{ fontSize: '22px', fontWeight: 800, color: '#0d1421' }}>FraudShield</div>
-        <div style={{ fontSize: '13px', color: '#6b7280' }}>Secure Mobile Money</div>
-      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px', gap: '32px', justifyContent: 'center' }}>
 
-      {/* Card */}
-      <div style={card}>
-        <div style={{ fontSize: '20px', fontWeight: 800, color: '#0d1421' }}>Sign In</div>
-        <div style={{ fontSize: '14px', color: '#6b7280' }}>Enter your registered Ghana mobile number.</div>
-
-        <form onSubmit={handleContinue} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <label style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280' }}>Mobile Number</label>
-            <div style={{ display: 'flex', borderRadius: '12px', border: '1.5px solid #e8ecef', overflow: 'hidden', background: '#fff' }}>
-              <div style={{ padding: '13px 14px', background: '#f5f7fa', borderRight: '1.5px solid #e8ecef', fontSize: '14px', fontWeight: 600, color: '#6b7280', whiteSpace: 'nowrap' }}>
-                🇬🇭 +233
-              </div>
-              <input
-                type="tel"
-                placeholder="24 000 0000"
-                value={phone}
-                onChange={e => { setPhone(e.target.value); setError('') }}
-                autoFocus
-                style={{ flex: 1, padding: '13px 14px', fontSize: '16px', border: 'none', outline: 'none', fontFamily: 'Inter, sans-serif', color: '#0d1421' }}
-              />
-            </div>
-            {error && <div style={{ fontSize: '12px', color: '#de350b' }}>⚠ {error}</div>}
+        {/* Brand */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: C.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill={C.primary}><path d="M12 2L4 6v6c0 5.25 3.5 10.15 8 11.5C16.5 22.15 20 17.25 20 12V6l-8-4z"/></svg>
           </div>
+          <div style={{ fontSize: '22px', fontWeight: '800', color: C.text }}>FraudShield</div>
+          <div style={{ fontSize: '13px', color: C.textSub }}>Secure Mobile Money</div>
+        </div>
 
-          <button
-            type="submit"
-            disabled={!phone || loading}
-            style={{ ...btn, opacity: (!phone || loading) ? 0.4 : 1 }}
-          >
-            {loading ? 'Sending code…' : 'Continue →'}
-          </button>
-        </form>
-      </div>
+        {/* Card */}
+        <div style={s.card}>
+          <div style={{ fontSize: '20px', fontWeight: '800', color: C.text }}>Sign In</div>
+          <div style={{ fontSize: '14px', color: C.textSub, lineHeight: '20px', marginTop: '-8px' }}>Enter your registered Ghana mobile number.</div>
 
-      <div style={{ textAlign: 'center', fontSize: '12px', color: '#9ca3af' }}>
-        Protected by 256-bit encryption &amp; blockchain audit trail
+          <form onSubmit={handleContinue} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={s.fieldLabel}>Mobile Number</label>
+              <div style={{ display: 'flex', borderRadius: '12px', border: `1.5px solid ${C.border}`, overflow: 'hidden' }}>
+                <div style={{ padding: '14px', background: C.bg, borderRight: `1px solid ${C.border}`, fontSize: '14px', fontWeight: '600', color: C.textSub, display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                  🇬🇭 +233
+                </div>
+                <input type="tel" placeholder="20 000 0000" value={phone} autoFocus
+                  onChange={e => { setPhone(e.target.value); setError('') }}
+                  style={{ flex: 1, padding: '14px', fontSize: '16px', border: 'none', outline: 'none', fontFamily: 'inherit', color: C.text, background: C.surface }}
+                />
+              </div>
+              {error && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: C.danger }}>⚠ {error}</div>}
+            </div>
+
+            <button type="submit" disabled={!phone || loading}
+              style={{ ...s.primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: (!phone || loading) ? 0.4 : 1 }}>
+              {loading ? 'Please wait…' : 'Continue'}{!loading && ' →'}
+            </button>
+          </form>
+        </div>
+
+        <div style={{ textAlign: 'center', fontSize: '12px', color: C.textMuted, lineHeight: '18px' }}>
+          Protected by 256-bit encryption &amp; blockchain audit trail
+        </div>
       </div>
     </CustomerLayout>
   )
 }
 
-const card = {
-  background: '#fff', borderRadius: '20px', padding: '24px',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.07)', display: 'flex',
-  flexDirection: 'column', gap: '16px',
-}
-const btn = {
-  padding: '14px', borderRadius: '12px', background: '#1652F0',
-  color: '#fff', fontSize: '15px', fontWeight: 700, border: 'none',
-  cursor: 'pointer', fontFamily: 'Inter, sans-serif', width: '100%',
+const s = {
+  card:       { background: '#FFFFFF', borderRadius: '20px', padding: '24px', gap: '16px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' },
+  primaryBtn: { padding: '16px', borderRadius: '14px', background: '#1652F0', color: '#fff', fontSize: '16px', fontWeight: '700', border: 'none', cursor: 'pointer', fontFamily: 'inherit', width: '100%' },
+  fieldLabel: { fontSize: '13px', fontWeight: '600', color: '#6B7280' },
 }
