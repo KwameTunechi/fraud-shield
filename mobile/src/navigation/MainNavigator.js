@@ -6,6 +6,9 @@ import HomeScreen from '../screens/main/HomeScreen';
 import TransactionsScreen from '../screens/main/TransactionsScreen';
 import TransactionDetailScreen from '../screens/main/TransactionDetailScreen';
 import SendMoneyScreen from '../screens/main/SendMoneyScreen';
+import ReceiveScreen from '../screens/main/ReceiveScreen';
+import AirtimeScreen from '../screens/main/AirtimeScreen';
+import PayBillScreen from '../screens/main/PayBillScreen';
 import SecurityScreen from '../screens/main/SecurityScreen';
 import FraudScenarioScreen from '../screens/main/FraudScenarioScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
@@ -22,6 +25,9 @@ function HomeStackNav() {
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="HomeMain" component={HomeScreen} />
       <HomeStack.Screen name="SendMoney" component={SendMoneyScreen} />
+      <HomeStack.Screen name="Receive"  component={ReceiveScreen} />
+      <HomeStack.Screen name="Airtime"  component={AirtimeScreen} />
+      <HomeStack.Screen name="PayBill"  component={PayBillScreen} />
     </HomeStack.Navigator>
   );
 }

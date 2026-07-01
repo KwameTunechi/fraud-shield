@@ -88,9 +88,9 @@ export default function HomeScreen({ navigation }) {
 
   const ACTIONS = [
     { label: 'Send',    icon: 'arrow-up-outline',       onPress: () => navigation.navigate('SendMoney') },
-    { label: 'Receive', icon: 'arrow-down-outline',     onPress: () => Alert.alert('Receive Money', `Share your number:\n${user?.phone ?? ''}`) },
-    { label: 'Airtime', icon: 'phone-portrait-outline', onPress: () => Alert.alert('Airtime Top-up', 'Coming soon.') },
-    { label: 'Pay Bill',icon: 'receipt-outline',        onPress: () => Alert.alert('Pay Bill', 'Coming soon.') },
+    { label: 'Receive', icon: 'arrow-down-outline',     onPress: () => navigation.navigate('Receive') },
+    { label: 'Airtime', icon: 'phone-portrait-outline', onPress: () => navigation.navigate('Airtime') },
+    { label: 'Pay Bill',icon: 'receipt-outline',        onPress: () => navigation.navigate('PayBill') },
   ];
 
   const initials = (user?.fullName ?? 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
