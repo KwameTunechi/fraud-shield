@@ -2,29 +2,19 @@ import { useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, AlertTriangle, CheckCircle, Clock, User, CreditCard,
-  ShieldAlert, ShieldCheck, History, AlertCircle, X,
+  ShieldAlert, ShieldCheck, History, AlertCircle, X, Brain,
 } from 'lucide-react'
 import DashboardLayout from '../components/DashboardLayout'
 import Loading from '../components/Loading'
 import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
+import { REASON_EXPLANATIONS, STATUS_EXPLANATIONS } from '../utils/riskExplanations'
 
 const SEVERITY = {
   critical: { iconBg: '#ef4444', bg: '#fef2f2', border: '#fecaca', label: 'Critical', Icon: AlertTriangle },
   high:     { iconBg: '#f97316', bg: '#fff7ed', border: '#fed7aa', label: 'High',     Icon: AlertTriangle },
   medium:   { iconBg: '#eab308', bg: '#fefce8', border: '#fef08a', label: 'Medium',   Icon: AlertCircle  },
   low:      { iconBg: '#3b82f6', bg: '#eff6ff', border: '#bfdbfe', label: 'Low',      Icon: CheckCircle  },
-}
-
-const REASON_LABELS = {
-  late_night:                  'Late-night transaction (22:00–05:00)',
-  amount_above_2000_ghs:       'Amount above GHS 2,000',
-  new_recipient:               'New recipient — no prior transactions',
-  amount_3x_avg:               'Amount 3× your rolling average',
-  amount_3x_rolling_avg:       'Amount exceeds 3× rolling average',
-  rapid_succession:            'Multiple transactions in quick succession',
-  recipient_flagged:           'Recipient flagged in recent alerts',
-  recipient_flagged_in_alerts: 'Recipient flagged in recent alerts',
 }
 
 function fmtMoney(n) {
@@ -254,17 +244,67 @@ export default function IncidentDetail() {
                   ))}
                 </div>
 
-                {reasons.length > 0 && (
-                  <div style={{ background: '#fef2f2', borderRadius: '10px', padding: '14px 16px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color: '#ef4444', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Risk Flags</div>
-                    {reasons.map(r => (
-                      <div key={r} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
-                        <ShieldAlert size={13} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <span style={{ fontSize: '12px', color: '#374151' }}>{REASON_LABELS[r] ?? r}</span>
+                {/* AI Risk score bar */}
+                {tx.risk_score != null && (() => {
+                  const rsk = tx.risk_score
+                  const rColor = rsk < 30 ? '#16a34a' : rsk < 70 ? '#d97706' : '#dc2626'
+                  const statusEx = STATUS_EXPLANATIONS[currentTxStatus] ?? STATUS_EXPLANATIONS.completed
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+                      {/* Score bar */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Brain size={13} color="#4f6ef7" />
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>AI Risk Score</span>
+                          </div>
+                          <span style={{ fontSize: '18px', fontWeight: 800, color: rColor }}>{rsk} / 100</span>
+                        </div>
+                        <div style={{ height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ width: `${rsk}%`, height: '100%', background: rColor, borderRadius: '4px' }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '3px' }}>
+                          <span style={{ fontSize: '10px', color: '#94a3b8' }}>0 — Safe</span>
+                          <span style={{ fontSize: '10px', color: '#94a3b8' }}>30 — Review</span>
+                          <span style={{ fontSize: '10px', color: '#94a3b8' }}>70 — Block</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+
+                      {/* Verdict */}
+                      <div style={{ background: statusEx.bg, borderRadius: '10px', padding: '12px 14px' }}>
+                        <div style={{ fontSize: '12px', fontWeight: 800, color: statusEx.color, marginBottom: '4px' }}>{statusEx.headline}</div>
+                        <div style={{ fontSize: '12px', color: '#475569', lineHeight: '18px' }}>{statusEx.detail}</div>
+                      </div>
+
+                      {/* Explanation cards */}
+                      {reasons.length > 0 && (
+                        <div>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', marginBottom: '8px' }}>
+                            Why was this flagged? ({reasons.length} signal{reasons.length !== 1 ? 's' : ''} detected)
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {reasons.map(r => {
+                              const ex = REASON_EXPLANATIONS[r] ?? { title: r, detail: 'No additional details.', points: '?', icon: '⚠️', severity: 'medium' }
+                              const isCritical = ex.severity === 'critical'
+                              return (
+                                <div key={r} style={{ background: isCritical ? '#fff5f5' : '#f8fafc', border: `1px solid ${isCritical ? '#fecaca' : '#e2e8f0'}`, borderRadius: '10px', padding: '12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                    <span style={{ fontSize: '18px', flexShrink: 0 }}>{ex.icon}</span>
+                                    <div style={{ flex: 1 }}>
+                                      <div style={{ fontSize: '12px', fontWeight: 700, color: isCritical ? '#dc2626' : '#0f172a' }}>{ex.title}</div>
+                                      <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '1px' }}>+{ex.points} risk points · {isCritical ? 'Critical' : 'Moderate'}</div>
+                                    </div>
+                                  </div>
+                                  <div style={{ fontSize: '12px', color: '#475569', lineHeight: '17px' }}>{ex.detail}</div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {/* Action buttons */}
                 {!resolved && currentTxStatus === 'review' && (
