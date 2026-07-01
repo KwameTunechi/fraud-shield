@@ -8,7 +8,7 @@ import { pool } from './pool.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 async function migrate() {
-  for (const file of ['001_initial_schema.sql', '002_settings.sql']) {
+  for (const file of ['001_initial_schema.sql', '002_settings.sql', '003_improvements.sql']) {
     const sql = readFileSync(resolve(__dirname, 'migrations', file), 'utf8');
     await pool.query(sql);
     console.log(`  ✓ ${file}`);

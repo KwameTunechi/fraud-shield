@@ -5,14 +5,21 @@ import crypto from 'crypto';
 import { pool, withTransaction } from '../db/pool.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
 import { scoreTransaction } from '../services/risk/scorer.js';
+import { verifyPin } from '../services/auth/pin.js';
 import { publish } from '../services/events/bus.js';
 import { appendEntry } from '../services/blockchain/ledger.js';
 
 const router = Router();
 
+const REVIEW_THRESHOLD = 30;
+const BLOCK_THRESHOLD  = 70;
+const MAX_PIN_ATTEMPTS = 5;
+const LOCKOUT_MINUTES  = 15;
+
 const createSchema = z.object({
   recipientPhone: z.string().regex(/^\+233\d{9}$/),
   amount:         z.number().positive().max(50000),
+  pin:            z.string().regex(/^\d{4}$/),
   category:       z.enum(['P2P', 'AGENT', 'MERCHANT']).default('P2P'),
 });
 
@@ -27,13 +34,57 @@ router.post('/', authenticate, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
   }
-  const { recipientPhone, amount, category } = parsed.data;
+  const { recipientPhone, amount, pin, category } = parsed.data;
 
   const { rows: senderRows } = await pool.query(
     'SELECT * FROM users WHERE id = $1', [req.principal.sub]
   );
   const sender = senderRows[0];
   if (!sender) return res.status(404).json({ error: 'Sender not found' });
+
+  // ── Account lockout check ──────────────────────────────────────────────────
+  if (sender.locked_until && new Date(sender.locked_until) > new Date()) {
+    const minutesLeft = Math.ceil((new Date(sender.locked_until) - new Date()) / 60000);
+    return res.status(423).json({
+      error: `Account temporarily locked due to too many failed PIN attempts. Try again in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`,
+    });
+  }
+
+  // ── PIN verification ───────────────────────────────────────────────────────
+  const pinValid = await verifyPin(pin, sender.pin_hash);
+  if (!pinValid) {
+    const newAttempts = (sender.failed_pin_attempts || 0) + 1;
+    const shouldLock  = newAttempts >= MAX_PIN_ATTEMPTS;
+    await pool.query(
+      `UPDATE users
+       SET failed_pin_attempts = $1,
+           locked_until        = $2
+       WHERE id = $3`,
+      [
+        shouldLock ? 0 : newAttempts,
+        shouldLock ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000) : null,
+        sender.id,
+      ]
+    );
+    if (shouldLock) {
+      return res.status(423).json({
+        error: `Too many failed PIN attempts. Account locked for ${LOCKOUT_MINUTES} minutes.`,
+      });
+    }
+    const remaining = MAX_PIN_ATTEMPTS - newAttempts;
+    return res.status(401).json({
+      error: `Incorrect PIN. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`,
+    });
+  }
+
+  // PIN correct — reset lockout counters
+  if (sender.failed_pin_attempts > 0) {
+    await pool.query(
+      'UPDATE users SET failed_pin_attempts = 0, locked_until = NULL WHERE id = $1',
+      [sender.id]
+    );
+  }
+
   if (sender.phone_number === recipientPhone) {
     return res.status(400).json({ error: 'Cannot send to yourself' });
   }
@@ -65,6 +116,20 @@ router.post('/', authenticate, async (req, res) => {
       await client.query(
         'UPDATE users SET balance = balance + $1 WHERE phone_number = $2',
         [amount, recipientPhone]
+      );
+    }
+
+    // ── Dynamic trust score update ─────────────────────────────────────────
+    // Completed transactions build trust; blocked ones reduce it
+    if (finalStatus === 'completed') {
+      await client.query(
+        'UPDATE users SET trust_score = LEAST(100, trust_score + 2) WHERE id = $1',
+        [sender.id]
+      );
+    } else if (finalStatus === 'blocked') {
+      await client.query(
+        'UPDATE users SET trust_score = GREATEST(0, trust_score - 10) WHERE id = $1',
+        [sender.id]
       );
     }
 
@@ -102,7 +167,7 @@ router.post('/', authenticate, async (req, res) => {
         [
           score >= BLOCK_THRESHOLD ? 'high_risk'        : 'review_required',
           score >= BLOCK_THRESHOLD ? 'Transaction blocked' : 'Transaction under review',
-          `Risk score: ${score}. Reasons: ${reasons.join(', ')}`,
+          `Risk score: ${score}/100. Signals: ${reasons.join(', ')}`,
           score >= BLOCK_THRESHOLD ? 'critical'         : 'high',
           sender.id,
           tx.id,
@@ -122,8 +187,7 @@ router.post('/', authenticate, async (req, res) => {
     publish('alert.new', { transactionId: inserted.id, score, reasons });
   }
 
-  // Append to the blockchain audit trail AFTER the DB commit so we never
-  // log a transaction that did not actually persist
+  // Append to the blockchain audit trail AFTER the DB commit
   try {
     const blockchainHash = await appendEntry({
       eventType:     'transaction',
@@ -138,22 +202,17 @@ router.post('/', authenticate, async (req, res) => {
         reasons,
       },
     });
-    // Back-fill the blockchain_hash column on the transaction row
     await pool.query(
       'UPDATE transactions SET blockchain_hash = $1 WHERE id = $2',
       [blockchainHash, inserted.id]
     );
     inserted.blockchain_hash = blockchainHash;
   } catch (err) {
-    // Blockchain append failure must not roll back the financial transaction
     console.error('Blockchain append failed:', err.message);
   }
 
   res.status(201).json({ transaction: inserted, score, status, reasons });
 });
-
-const REVIEW_THRESHOLD = 30;
-const BLOCK_THRESHOLD  = 70;
 
 // ─── GET /api/transactions — paginated list ───────────────────────────────────
 
@@ -166,7 +225,6 @@ router.get('/', authenticate, async (req, res) => {
   const where  = [];
   const params = [];
 
-  // Customers see only their own transactions
   if (req.principal.type === 'user') {
     params.push(req.principal.sub);
     where.push(`sender_id = $${params.length}`);
@@ -236,10 +294,10 @@ router.put('/:id/status', authenticate, requireAdmin, async (req, res) => {
     if (!current[0]) return null;
     const tx = current[0];
 
-    // Admin rejects a review transaction → refund sender
+    // Admin rejects a review transaction → refund sender, reduce trust score
     if (tx.status === 'review' && req.body.status === 'blocked') {
       await client.query(
-        'UPDATE users SET balance = balance + $1 WHERE id = $2',
+        'UPDATE users SET balance = balance + $1, trust_score = GREATEST(0, trust_score - 5) WHERE id = $2',
         [tx.amount, tx.sender_id]
       );
       if (tx.recipient_id) {
@@ -248,6 +306,14 @@ router.put('/:id/status', authenticate, requireAdmin, async (req, res) => {
           [tx.amount, tx.recipient_id]
         );
       }
+    }
+
+    // Admin approves a review transaction → slight trust boost
+    if (tx.status === 'review' && req.body.status === 'completed') {
+      await client.query(
+        'UPDATE users SET trust_score = LEAST(100, trust_score + 1) WHERE id = $1',
+        [tx.sender_id]
+      );
     }
 
     const { rows } = await client.query(
@@ -266,14 +332,12 @@ router.put('/:id/status', authenticate, requireAdmin, async (req, res) => {
 });
 
 // ─── POST /api/transactions/preview ─────────────────────────────────────────
-// Scores a transaction without persisting it. Used by the mobile app to show
-// the AI risk verdict before the user taps confirm.
 
 router.post('/preview', authenticate, async (req, res) => {
   if (req.principal.type !== 'user') {
     return res.status(403).json({ error: 'Customers only' });
   }
-  const parsed = createSchema.safeParse(req.body);
+  const parsed = createSchema.omit({ pin: true }).safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
   }

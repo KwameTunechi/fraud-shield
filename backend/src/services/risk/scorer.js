@@ -50,13 +50,14 @@ const RULES = [
     return null;
   },
 
-  // Rule 5 — Rapid succession: more than 3 transactions in the last 10 minutes
+  // Rule 5 — Rapid succession: more than 3 non-blocked transactions in the last 10 minutes
   async ({ senderId }) => {
     const { rows } = await pool.query(
       `SELECT COUNT(*)::int AS c
        FROM transactions
        WHERE sender_id = $1
-         AND created_at > NOW() - INTERVAL '10 minutes'`,
+         AND created_at > NOW() - INTERVAL '10 minutes'
+         AND status != 'blocked'`,
       [senderId]
     );
     if (rows[0].c > 3) return { points: 15, reason: 'rapid_succession' };
