@@ -115,7 +115,7 @@ router.post('/admin/verify-mfa', async (req, res) => {
     role:  admin.role,
     email: admin.email,
   });
-  const refreshToken = await issueRefreshToken({
+  const { raw: refreshToken } = await issueRefreshToken({
     adminId:     admin.id,
     ip:          req.ip,
     fingerprint: req.headers['user-agent'] || null,
@@ -175,6 +175,8 @@ router.post('/refresh', async (req, res) => {
     type:  isAdmin ? 'admin' : 'user',
     role:  principal.role,
     email: principal.email,
+    phone: !isAdmin ? principal.phone_number : undefined,
+    sid:   !isAdmin ? session.id : undefined,
   });
   res.json({ accessToken });
 });
@@ -277,18 +279,20 @@ router.post('/customer/verify-otp', async (req, res) => {
 
   const pinSetup = !user.pin_hash; // true when mobile should prompt PIN setup
 
+  // forCustomer=true deletes all prior sessions for this user before creating the new one,
+  // enforcing the single-active-session rule — any device already logged in is kicked out.
+  const { raw: refreshToken, sid } = await issueRefreshToken({
+    userId:      user.id,
+    ip:          req.ip,
+    fingerprint: req.headers['user-agent'] || null,
+    forCustomer: true,
+  });
+
   const accessToken = signAccessToken({
     sub:   user.id,
     type:  'user',
     phone: user.phone_number,
-  });
-
-  // Mobile apps can't use httpOnly cookies — send the refresh token in the body.
-  // The mobile app stores it in expo-secure-store (iOS Keychain / Android Keystore).
-  const refreshToken = await issueRefreshToken({
-    userId:      user.id,
-    ip:          req.ip,
-    fingerprint: req.headers['user-agent'] || null,
+    sid,
   });
 
   res.json({
@@ -358,12 +362,14 @@ router.post('/customer/verify-pin', async (req, res) => {
     user.mfa_enabled = true;
   }
 
-  const accessToken = signAccessToken({ sub: user.id, type: 'user', phone: user.phone_number });
-  const refreshToken = await issueRefreshToken({
+  const { raw: refreshToken, sid } = await issueRefreshToken({
     userId:      user.id,
     ip:          req.ip,
     fingerprint: req.headers['user-agent'] || null,
+    forCustomer: true,
   });
+
+  const accessToken = signAccessToken({ sub: user.id, type: 'user', phone: user.phone_number, sid });
 
   res.json({
     status: 'ok',

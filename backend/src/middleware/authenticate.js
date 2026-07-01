@@ -1,27 +1,35 @@
 // backend/src/middleware/authenticate.js
-import { verifyAccessToken } from '../services/auth/tokens.js';
+import { verifyAccessToken, isSessionActive } from '../services/auth/tokens.js';
 
-// Reads Authorization: Bearer <token>, verifies it, and attaches req.principal.
-// Use on any route that requires a logged-in user.
-export function authenticate(req, res, next) {
+export async function authenticate(req, res, next) {
   const header = req.headers.authorization || '';
-  // req.query.token is a fallback for SSE clients — EventSource cannot send headers
   const token = header.startsWith('Bearer ') ? header.slice(7) : (req.query.token || null);
   if (!token) return res.status(401).json({ error: 'Missing access token' });
 
+  let payload;
   try {
-    const payload = verifyAccessToken(token);
-    if (payload.type !== 'admin' && payload.type !== 'user') {
-      return res.status(401).json({ error: 'Wrong token type' });
-    }
-    req.principal = payload;
-    next();
+    payload = verifyAccessToken(token);
   } catch {
     return res.status(401).json({ error: 'Invalid or expired access token' });
   }
+
+  if (payload.type !== 'admin' && payload.type !== 'user') {
+    return res.status(401).json({ error: 'Wrong token type' });
+  }
+
+  // Customer tokens carry a session id (sid). If another device has since logged
+  // in, the session is deleted from Redis and this check rejects the old device.
+  if (payload.type === 'user' && payload.sid) {
+    const active = await isSessionActive(payload.sid);
+    if (!active) {
+      return res.status(401).json({ error: 'Session replaced by a new login. Please sign in again.' });
+    }
+  }
+
+  req.principal = payload;
+  next();
 }
 
-// Use after authenticate() to restrict a route to admins only.
 export function requireAdmin(req, res, next) {
   if (req.principal?.type !== 'admin') {
     return res.status(403).json({ error: 'Admins only' });
@@ -29,7 +37,6 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
-// Use after authenticate() to restrict a route to specific roles.
 export function requireRole(...roles) {
   return (req, res, next) => {
     if (!roles.includes(req.principal?.role)) {
