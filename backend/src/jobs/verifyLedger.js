@@ -16,8 +16,14 @@ export function startLedgerVerifier() {
         console.error('BLOCKCHAIN INTEGRITY VIOLATION:', result);
         await pool.query(
           `INSERT INTO alerts (type, title, description, severity)
-           VALUES ('integrity_violation', 'Blockchain integrity violation', $1, 'critical')`,
-          [`Bad entry id ${result.badAt}: ${result.reason}`]
+           VALUES ('integrity_violation', 'Blockchain Integrity Violation Detected', $1, 'critical')`,
+          [`The automated ledger audit detected a hash mismatch at entry ${result.badAt}. This may indicate data tampering or a storage anomaly. Immediate review is recommended.`]
+        );
+      } else {
+        // Chain is healthy — auto-resolve any open integrity violation alerts
+        await pool.query(
+          `UPDATE alerts SET resolved = true, resolved_at = NOW()
+           WHERE type = 'integrity_violation' AND resolved = false`
         );
       }
     } catch (err) {

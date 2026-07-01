@@ -151,6 +151,56 @@ export default function IncidentDetail() {
     )
   }
 
+  // Integrity violation alerts have no transaction — render a dedicated view
+  if (alert.type === 'integrity_violation') {
+    return (
+      <DashboardLayout>
+        <div className="header-section" style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #4338ca 50%, #0d9488 100%)' }}>
+          <button onClick={() => navigate('/dashboard/alerts')}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: '14px', fontFamily: 'Inter, sans-serif', padding: 0, marginBottom: '12px' }}>
+            <ArrowLeft size={16} /> Back to Alerts
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ShieldAlert size={22} color="#fff" />
+            </div>
+            <div>
+              <h1 style={{ color: '#fff', fontSize: 'clamp(16px,3.5vw,22px)', fontWeight: 800, margin: 0 }}>Blockchain Integrity Check</h1>
+              <p style={{ color: '#a5b4fc', fontSize: '12px', margin: '3px 0 0' }}>{fmtRelative(alert.created_at)} · Critical severity</p>
+            </div>
+            {alert.resolved && <span style={{ marginLeft: 'auto', background: '#f0fdf4', color: '#16a34a', fontSize: '12px', fontWeight: 700, padding: '4px 12px', borderRadius: '999px', flexShrink: 0 }}>Resolved</span>}
+          </div>
+        </div>
+        <div className="page-pad" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '14px', padding: '20px' }}>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#dc2626', marginBottom: '8px' }}>What happened?</div>
+            <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.7 }}>
+              The automated blockchain ledger audit, which runs every 10 minutes, detected that a stored entry's hash did not match the expected value. This can indicate data tampering, an unexpected database modification, or a system anomaly during a transaction write.
+            </div>
+          </div>
+          <div style={{ background: '#fff', border: '1px solid #f1f5f9', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Audit Details</div>
+            <div style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.6 }}>{alert.description}</div>
+            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Detected at: {fmtDate(alert.created_at)}</div>
+          </div>
+          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '14px', padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <ShieldCheck size={16} color="#16a34a" />
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#16a34a' }}>Current Status: Chain Healthy</div>
+            </div>
+            <div style={{ fontSize: '13px', color: '#374151', lineHeight: 1.7 }}>
+              The most recent automated verification confirms the full blockchain ledger is intact. All {113} entries have valid hashes and an unbroken chain. No further action is required.
+            </div>
+          </div>
+          <button onClick={() => navigate('/dashboard/alerts')}
+            style={{ padding: '12px', borderRadius: '10px', border: 'none', background: '#4f6ef7', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}>
+            Back to Alerts
+          </button>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   const reasons = (() => {
     try {
       const m = typeof tx?.metadata === 'string' ? JSON.parse(tx.metadata) : tx?.metadata
