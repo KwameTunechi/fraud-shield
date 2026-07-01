@@ -72,7 +72,7 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
     const remaining = MAX_PIN_ATTEMPTS - newAttempts;
-    return res.status(401).json({
+    return res.status(400).json({
       error: `Incorrect PIN. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`,
     });
   }
