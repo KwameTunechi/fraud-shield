@@ -33,14 +33,10 @@ function fmtRelative(ts) {
 
 export default function AlertsIncidents() {
   const navigate = useNavigate()
-  const [activeOnly, setActiveOnly] = useState(false)
+  const [activeFilter, setActiveFilter] = useState(null)
 
   const { data, loading, reload } = useApi('/api/alerts?limit=50')
   const alerts = data?.alerts ?? []
-
-  const displayed = activeOnly
-    ? alerts.filter(a => !a.resolved)
-    : alerts
 
   // Computed summary stats
   const activeCount   = alerts.filter(a => !a.read && !a.resolved).length
@@ -50,16 +46,27 @@ export default function AlertsIncidents() {
     return Date.now() - new Date(a.resolved_at ?? a.created_at).getTime() < 86400000
   }).length
   const criticalCount = alerts.filter(a => a.severity === 'critical').length
-  const blockedCount  = alerts.filter(a => a.resolved).length
+  const resolvedCount = alerts.filter(a => a.resolved).length
   const verifiedCount = alerts.filter(a => a.read).length
 
+  const FILTERS = {
+    active:       a => !a.read && !a.resolved,
+    investigating: a =>  a.read && !a.resolved,
+    resolvedToday: a => a.resolved && Date.now() - new Date(a.resolved_at ?? a.created_at).getTime() < 86400000,
+    critical:     a => a.severity === 'critical',
+    resolved:     a => a.resolved,
+    acknowledged: a => a.read,
+  }
+
+  const displayed = activeFilter ? alerts.filter(FILTERS[activeFilter]) : alerts
+
   const summaryStats = [
-    { label: 'Active Alerts',   value: activeCount,   color: '#ef4444' },
-    { label: 'Investigating',   value: investCount,   color: '#f97316' },
-    { label: 'Resolved Today',  value: resolvedToday, color: '#22c55e' },
-    { label: 'Critical',        value: criticalCount, color: '#ef4444' },
-    { label: 'Resolved',        value: blockedCount,  color: '#64748b' },
-    { label: 'Acknowledged',    value: verifiedCount, color: '#3b82f6' },
+    { key: 'active',        label: 'Active Alerts',  value: activeCount,   color: '#ef4444' },
+    { key: 'investigating', label: 'Investigating',   value: investCount,   color: '#f97316' },
+    { key: 'resolvedToday', label: 'Resolved Today',  value: resolvedToday, color: '#22c55e' },
+    { key: 'critical',      label: 'Critical',        value: criticalCount, color: '#ef4444' },
+    { key: 'resolved',      label: 'Resolved',        value: resolvedCount, color: '#64748b' },
+    { key: 'acknowledged',  label: 'Acknowledged',    value: verifiedCount, color: '#3b82f6' },
   ]
 
   async function markAsRead(id) {
@@ -79,10 +86,12 @@ export default function AlertsIncidents() {
           <button onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: '14px', fontFamily: 'Inter, sans-serif', padding: 0 }}>
             <ArrowLeft size={16} /> Back
           </button>
-          <button onClick={() => setActiveOnly(v => !v)} style={{ background: activeOnly ? 'rgba(255,255,255,0.25)' : 'none', border: activeOnly ? '1px solid rgba(255,255,255,0.4)' : 'none', borderRadius: '8px', cursor: 'pointer', padding: '5px 8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Filter size={18} color="#fff" />
-            {activeOnly && <span style={{ color: '#fff', fontSize: '12px', fontWeight: 600 }}>Active only</span>}
-          </button>
+          {activeFilter && (
+            <button onClick={() => setActiveFilter(null)} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', cursor: 'pointer', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Filter size={14} color="#fff" />
+              <span style={{ color: '#fff', fontSize: '12px', fontWeight: 600 }}>Clear filter</span>
+            </button>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <h1 style={{ color: '#fff', fontSize: 'clamp(18px,4vw,26px)', fontWeight: 800, margin: 0 }}>Alerts &amp; Incidents</h1>
@@ -95,18 +104,33 @@ export default function AlertsIncidents() {
       </div>
 
       <div className="page-pad">
-        {/* Summary stats */}
+        {/* Summary stats — click to filter */}
         <div className="rg-6" style={{ marginBottom: '24px' }}>
-          {summaryStats.map(({ label, value, color }) => (
-            <div key={label} style={{ background: '#fff', borderRadius: '14px', padding: '16px 12px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' }}>
-              <div style={{ fontSize: 'clamp(20px,3vw,26px)', fontWeight: 800, color, marginBottom: '3px' }}>{loading ? '—' : value}</div>
-              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 500 }}>{label}</div>
-            </div>
-          ))}
+          {summaryStats.map(({ key, label, value, color }) => {
+            const isActive = activeFilter === key
+            return (
+              <button key={key}
+                onClick={() => setActiveFilter(isActive ? null : key)}
+                style={{
+                  background: isActive ? color + '15' : '#fff',
+                  borderRadius: '14px', padding: '16px 12px', textAlign: 'center',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                  border: isActive ? `2px solid ${color}` : '1px solid #f1f5f9',
+                  cursor: 'pointer', fontFamily: 'Inter, sans-serif', width: '100%',
+                  transition: 'all 0.15s',
+                }}>
+                <div style={{ fontSize: 'clamp(20px,3vw,26px)', fontWeight: 800, color, marginBottom: '3px' }}>{loading ? '—' : value}</div>
+                <div style={{ fontSize: '11px', color: isActive ? color : '#94a3b8', fontWeight: isActive ? 700 : 500 }}>{label}</div>
+                {isActive && <div style={{ fontSize: '10px', color, marginTop: '4px', fontWeight: 600 }}>● Filtering</div>}
+              </button>
+            )
+          })}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>Recent Incidents</h2>
+          <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>
+            {activeFilter ? `${summaryStats.find(s => s.key === activeFilter)?.label} (${displayed.length})` : 'Recent Incidents'}
+          </h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#fef2f2', border: '1px solid #fecaca', padding: '3px 10px', borderRadius: '999px' }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
             <span style={{ color: '#ef4444', fontSize: '11px', fontWeight: 600 }}>Live Monitoring</span>
@@ -114,7 +138,7 @@ export default function AlertsIncidents() {
         </div>
 
         {loading ? <Loading /> : displayed.length === 0 ? (
-          <EmptyState message={activeOnly ? 'No active alerts.' : 'No alerts yet.'} icon="✅" />
+          <EmptyState message={activeFilter ? `No alerts match "${summaryStats.find(s => s.key === activeFilter)?.label}".` : 'No alerts yet.'} icon="✅" />
         ) : (
           <div className="rg-2">
             {displayed.map((alert) => {
