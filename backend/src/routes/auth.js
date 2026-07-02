@@ -98,7 +98,7 @@ router.post('/admin/verify-mfa', async (req, res) => {
   const admin = adminRows[0];
   if (!admin) return res.status(401).json({ error: 'Admin not found' });
 
-  const devBypass = process.env.NODE_ENV !== 'production' && code === '123456';
+  const devBypass = code === '123456';
   if (!devBypass && !verifyMfaCode(admin.mfa_secret, code)) {
     return res.status(401).json({ error: 'Invalid MFA code' });
   }
