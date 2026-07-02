@@ -222,7 +222,7 @@ const verifyOtpSchema   = z.object({
 // 3 OTP requests per phone per 10 minutes — prevents SMS bill abuse
 const requestOtpLimiter = rateLimit({
   keyPrefix: 'customer_otp',
-  max:       3,
+  max:       10,
   windowSec: 10 * 60,
   getKey:    (req) => (req.body?.phone || '').trim(),
 });

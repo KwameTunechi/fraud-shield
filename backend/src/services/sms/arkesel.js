@@ -4,8 +4,8 @@
 // development and means the whole flow can be tested without a real phone.
 
 export async function sendSms(phone, message) {
-  if (process.env.NODE_ENV !== 'production' || !process.env.ARKESEL_API_KEY) {
-    console.log(`\n[DEV SMS] To: ${phone}\n[DEV SMS] Body: ${message}\n`);
+  if (!process.env.ARKESEL_API_KEY) {
+    console.log(`\n[SMS] To: ${phone}\n[SMS] Body: ${message}\n`);
     return { ok: true, dev: true };
   }
 
