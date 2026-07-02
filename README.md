@@ -4,6 +4,21 @@ A research project at the **University of Ghana** investigating how layered defe
 
 Mobile money fraud losses in Ghana reached **GH₵14.94M in early 2025**. FraudShield combines three pillars to detect and prevent attacks in real time:
 
+---
+
+## Live App
+
+| Portal | URL |
+|---|---|
+| Customer Portal (mobile web) | https://fraud-shield-zeta.vercel.app/app |
+| Admin Dashboard | https://fraud-shield-zeta.vercel.app/dashboard |
+
+**Admin login:** `admin@fraudshield.test` / `Password123!` / MFA: `123456`
+
+**Customer login:** any phone from `+233244100001` to `+233244100010` — OTP: `123456` — PIN: `1234`
+
+---
+
 | Pillar | Implementation |
 |--------|---------------|
 | 🤖 AI Risk Engine | Rule-based scorer with 6 explainable rules; every decision is auditable |
@@ -313,22 +328,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full guide.
 
 ### Quick Deploy
 
-**Backend (Railway):**
-1. Connect GitHub repo, set root directory: `backend`
-2. Add PostgreSQL + Redis add-ons
-3. Set environment variables (see DEPLOYMENT.md)
-4. Run `npm run db:migrate` → `npm run db:seed`
-
-**Web (Vercel):**
-1. Import GitHub repo, framework: Vite
-2. Set `VITE_API_URL` to the Railway URL
-3. Deploy
-
-**Mobile (EAS):**
-```bash
-cd mobile
-eas build --profile preview --platform android
-```
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for the full step-by-step guide covering both local bare-metal setup and cloud deployment (Vercel + Railway).
 
 ---
 
@@ -349,7 +349,7 @@ eas build --profile preview --platform android
 | 10 | Mobile: Home, SendMoney, Transactions, Profile | ✅ |
 | 11 | Mobile: returning-user flow, adaptive biometric MFA, all buttons wired | ✅ |
 | 12 | Admin portal audit: all pages verified, blockchain integrity fixed, session persistence | ✅ |
-| 13 | Deploy: Railway (backend) + Vercel (web) + EAS (Android APK) | ⬜ |
+| 13 | Deploy: Railway (backend) + Vercel (web) — live at fraud-shield-zeta.vercel.app | ✅ |
 
 ---
 
