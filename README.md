@@ -13,9 +13,7 @@ Mobile money fraud losses in Ghana reached **GH₵14.94M in early 2025**. FraudS
 | Customer Portal (mobile web) | https://fraud-shield-zeta.vercel.app/app |
 | Admin Dashboard | https://fraud-shield-zeta.vercel.app/dashboard |
 
-**Admin login:** `admin@fraudshield.test` / `Password123!` / MFA: `123456`
-
-**Customer login:** any phone from `+233244100001` to `+233244100010` — OTP: `123456` — PIN: `1234`
+**Demo credentials:** request access from the project team — not published here since this repo is public.
 
 ---
 
@@ -108,8 +106,8 @@ npm run dev                   # http://localhost:5173
 ```
 
 **Demo admin sign-in:**
-1. `/signin` → `admin@fraudshield.test` / `Password123!`
-2. MFA code: `123456` (dev bypass — in production use Google Authenticator)
+1. `/signin` → sign in with the seeded admin credentials (see `backend/src/db/seed.js` or request from the team)
+2. Enter the MFA code from your authenticator app (or the dev bypass code, non-prod only)
 3. Session persists across page refreshes via `localStorage`
 
 ### 3 — Run the mobile app
@@ -131,7 +129,7 @@ npx expo start    # scan QR in Expo Go on your phone
 ```
 
 **Demo customer sign-in:**
-- Phone: `0244000001` (or any of the 12 seeded customers)
+- Use one of the seeded customer phone numbers (see `backend/src/db/seed.js` or request from the team)
 - OTP prints to the backend terminal in dev mode
 - Set a 4-digit PIN on first sign-in; subsequent logins go straight to PIN screen
 - Biometric (fingerprint / Face ID) offered as a second factor on supported devices
