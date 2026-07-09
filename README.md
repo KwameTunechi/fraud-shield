@@ -6,19 +6,6 @@ Mobile money fraud losses in Ghana reached **GH₵14.94M in early 2025**. FraudS
 
 ---
 
-## Live App
-
-| Portal | URL |
-|---|---|
-| Customer Portal (mobile web) | https://fraud-shield-zeta.vercel.app/app |
-| Admin Dashboard | https://fraud-shield-zeta.vercel.app/dashboard |
-
-**Admin login:** `admin@fraudshield.test` / `Password123!` / MFA: `123456`
-
-**Customer login:** any phone from `+233244100001` to `+233244100010` — OTP: `123456` — PIN: `1234`
-
----
-
 | Pillar | Implementation |
 |--------|---------------|
 | 🤖 AI Risk Engine | Rule-based scorer with 6 explainable rules; every decision is auditable |
