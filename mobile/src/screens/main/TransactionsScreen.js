@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, FlatList, StyleSheet,
   SafeAreaView, RefreshControl, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useApi } from '../../hooks/useApi';
 
 const C = {
@@ -66,6 +67,10 @@ export default function TransactionsScreen({ navigation }) {
   const query = filter ? `?status=${filter}&limit=50` : '?limit=50';
   const { data, loading, reload } = useApi(`/api/transactions${query}`);
   const transactions = data?.transactions ?? [];
+
+  // Stack screens stay mounted, so refetch whenever this tab regains focus
+  // (e.g. returning from a just-completed Send/Airtime/Pay Bill transaction).
+  useFocusEffect(useCallback(() => { reload(); }, [reload]));
 
   // Group by date
   function groupByDate(txns) {

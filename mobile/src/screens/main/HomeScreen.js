@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
   SafeAreaView, RefreshControl, StatusBar, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useApi } from '../../hooks/useApi';
 
@@ -74,7 +75,7 @@ function AlertBadge({ severity }) {
 }
 
 export default function HomeScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [balanceHidden, setBalanceHidden] = useState(false);
 
   const { data: txData,    loading: txLoading,    reload: reloadTx    } = useApi('/api/transactions?limit=5');
@@ -84,7 +85,19 @@ export default function HomeScreen({ navigation }) {
   const alerts       = alertData?.alerts    ?? [];
   const unreadCount  = alerts.filter(a => !a.read).length;
 
-  function onRefresh() { reloadTx(); reloadAlerts(); }
+  function onRefresh() { reloadTx(); reloadAlerts(); refreshUser?.(); }
+
+  // Screens (SendMoney, Airtime, PayBill) stay mounted on the navigation
+  // stack and just goBack() to Home rather than remounting it, so the
+  // one-time fetch in useApi never reruns on its own — refetch on every
+  // focus so a just-completed transaction shows up immediately.
+  useFocusEffect(
+    useCallback(() => {
+      reloadTx();
+      reloadAlerts();
+      refreshUser?.();
+    }, [reloadTx, reloadAlerts, refreshUser])
+  );
 
   const ACTIONS = [
     { label: 'Send',    icon: 'arrow-up-outline',       onPress: () => navigation.navigate('SendMoney') },

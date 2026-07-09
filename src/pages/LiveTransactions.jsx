@@ -162,15 +162,34 @@ export default function LiveTransactions() {
   useEffect(() => {
     const token = getAccessToken()
     if (!token) return
-    const url = `${import.meta.env.VITE_API_URL}/api/events/stream?token=${encodeURIComponent(token)}`
-    const source = new EventSource(url)
-    source.addEventListener('transaction.new', (e) => {
-      const tx = JSON.parse(e.data)
-      setLive((prev) => [tx, ...prev].slice(0, 50))
-    })
-    source.addEventListener('transaction.status_changed', () => reload())
-    source.onerror = () => source.close()
-    return () => source.close()
+
+    let source
+    let reconnectTimer
+    let stopped = false
+
+    function connect() {
+      const url = `${import.meta.env.VITE_API_URL}/api/events/stream?token=${encodeURIComponent(token)}`
+      source = new EventSource(url)
+      source.addEventListener('transaction.new', (e) => {
+        const tx = JSON.parse(e.data)
+        setLive((prev) => [tx, ...prev].slice(0, 50))
+      })
+      source.addEventListener('transaction.status_changed', () => reload())
+      // Reconnect after a dropped connection instead of going silently stale —
+      // without this, one network blip means the page never gets another
+      // live update until the admin manually reloads.
+      source.onerror = () => {
+        source.close()
+        if (!stopped) reconnectTimer = setTimeout(connect, 3000)
+      }
+    }
+    connect()
+
+    return () => {
+      stopped = true
+      clearTimeout(reconnectTimer)
+      source?.close()
+    }
   }, [reload])
 
   const pagedTxns = data?.transactions ?? []
