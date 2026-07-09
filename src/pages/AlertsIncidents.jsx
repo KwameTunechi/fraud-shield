@@ -74,6 +74,11 @@ export default function AlertsIncidents() {
     reload()
   }
 
+  // Only safe to resolve directly from the list when there's no linked
+  // transaction (e.g. a blockchain integrity alert) — resolving here does
+  // NOT approve/reject the transaction. When a transaction is attached,
+  // send the admin to the detail page's Approve / Reject / Resolve choice
+  // instead, so "Resolve" never looks like it processed the transaction.
   async function resolve(id) {
     await api.put(`/api/alerts/${id}/resolve`)
     reload()
@@ -180,12 +185,21 @@ export default function AlertsIncidents() {
                             Mark read
                           </button>
                         )}
-                        <button
-                          onClick={e => { e.stopPropagation(); resolve(alert.id) }}
-                          style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '7px', border: 'none', background: '#4f6ef7', color: '#fff', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
-                        >
-                          Resolve
-                        </button>
+                        {alert.transaction_id ? (
+                          <button
+                            onClick={e => { e.stopPropagation(); navigate(`/dashboard/alerts/${alert.id}`, { state: { alert } }) }}
+                            style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '7px', border: 'none', background: '#4f6ef7', color: '#fff', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
+                          >
+                            Review →
+                          </button>
+                        ) : (
+                          <button
+                            onClick={e => { e.stopPropagation(); resolve(alert.id) }}
+                            style={{ fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '7px', border: 'none', background: '#4f6ef7', color: '#fff', cursor: 'pointer', fontFamily: 'Inter, sans-serif' }}
+                          >
+                            Resolve
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
