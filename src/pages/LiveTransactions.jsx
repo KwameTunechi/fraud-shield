@@ -14,7 +14,7 @@ const statusStyle = (s) => s === 'completed'
   : s === 'review'
   ? { color: '#d97706', bg: '#fffbeb', border: '#fde68a', label: 'Review'  }
   : { color: '#dc2626', bg: '#fef2f2', border: '#fecaca', label: 'Blocked' }
-const catColor    = (c) => c === 'AGENT' ? '#8b5cf6' : c === 'MERCHANT' ? '#14b8a6' : '#3b82f6'
+const catColor    = (c) => c === 'AGENT' ? '#8b5cf6' : c === 'MERCHANT' ? '#14b8a6' : c === 'AIRTIME' ? '#f59e0b' : c === 'BILL' ? '#0ea5e9' : '#3b82f6'
 const fmtAmount   = (n) => '₵' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })
 const fmtTime     = (ts) => new Date(ts).toLocaleTimeString('en-US', { hour12: false })
 const fmtDate     = (ts) => new Date(ts).toLocaleString('en-GH', { dateStyle: 'medium', timeStyle: 'short' })

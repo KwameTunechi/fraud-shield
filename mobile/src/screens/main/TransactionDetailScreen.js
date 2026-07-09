@@ -62,6 +62,8 @@ function statusStyle(s) {
 function categoryIcon(cat) {
   if (cat === 'MERCHANT') return 'storefront-outline';
   if (cat === 'AGENT')    return 'business-outline';
+  if (cat === 'AIRTIME')  return 'phone-portrait-outline';
+  if (cat === 'BILL')     return 'receipt-outline';
   return 'swap-horizontal-outline';
 }
 

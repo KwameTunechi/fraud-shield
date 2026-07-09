@@ -32,6 +32,8 @@ function riskStyle(score) {
 function categoryIcon(cat) {
   if (cat === 'MERCHANT') return '🏪'
   if (cat === 'AGENT')    return '🏢'
+  if (cat === 'AIRTIME')  return '📱'
+  if (cat === 'BILL')     return '🧾'
   return '↔'
 }
 
