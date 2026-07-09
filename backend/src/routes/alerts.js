@@ -39,9 +39,16 @@ router.get('/', authenticate, async (req, res) => {
 // ─── PUT /api/alerts/:id/read ─────────────────────────────────────────────────
 
 router.put('/:id/read', authenticate, async (req, res) => {
+  // Customers may only mark their own alerts as read; admins may mark any.
+  const params = [req.params.id];
+  let ownerClause = '';
+  if (req.principal.type === 'user') {
+    params.push(req.principal.sub);
+    ownerClause = ' AND user_id = $2';
+  }
   const { rows } = await pool.query(
-    'UPDATE alerts SET read = TRUE WHERE id = $1 RETURNING *',
-    [req.params.id]
+    `UPDATE alerts SET read = TRUE WHERE id = $1${ownerClause} RETURNING *`,
+    params
   );
   if (!rows[0]) return res.status(404).json({ error: 'Alert not found' });
   res.json(rows[0]);

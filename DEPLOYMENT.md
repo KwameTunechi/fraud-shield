@@ -20,28 +20,7 @@ Two supported deployment targets:
 
 ## Demo Credentials
 
-### Admin
-| Field | Value |
-|---|---|
-| Email | `admin@fraudshield.test` |
-| Password | `Password123!` |
-| MFA Code | `123456` |
-
-### Customers (web mobile app)
-All seeded customers use OTP code `123456` and PIN `1234`.
-
-| Name | Phone |
-|---|---|
-| Kwame Asante | +233244100001 |
-| Abena Osei | +233244100002 |
-| Kofi Mensah | +233244100003 |
-| Adwoa Boateng | +233244100004 |
-| Yaw Darko | +233244100005 |
-| Akosua Amponsah | +233244100006 |
-| Kojo Frimpong | +233244100007 |
-| Ama Asiedu | +233244100008 |
-| Nana Acheampong | +233244100009 |
-| Efua Owusu | +233244100010 |
+Demo admin and customer credentials (and the full list of seeded customer phone numbers) are defined in `backend/src/db/seed.js`. They are intentionally not published here since this repo is public — ask the team for access.
 
 > Note: Two users cannot be logged in with the same phone number simultaneously. If you get a "session replaced" message, switch to a different account.
 
