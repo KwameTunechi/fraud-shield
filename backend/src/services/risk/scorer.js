@@ -11,7 +11,7 @@ const THRESHOLDS = { safe: 30, review: 70 }; // 0-29 safe | 30-69 review | 70+ b
 // known destination — the customer's own number or a biller short code —
 // chosen from a picker, not typed in. A "new recipient" there is normal
 // and not a fraud signal the way a first-time P2P transfer is.
-const SELF_SERVICE_CATEGORIES = new Set(['AIRTIME', 'BILL']);
+export const SELF_SERVICE_CATEGORIES = new Set(['AIRTIME', 'BILL']);
 
 // Large-amount threshold, GHS. Airtime top-ups are typically ₵2–100; a
 // ₵2,000 top-up is far more anomalous than a ₵2,000 P2P transfer, so it

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { pool, withTransaction } from '../db/pool.js';
 import { authenticate, requireAdmin } from '../middleware/authenticate.js';
-import { scoreTransaction } from '../services/risk/scorer.js';
+import { scoreTransaction, SELF_SERVICE_CATEGORIES } from '../services/risk/scorer.js';
 import { verifyPin } from '../services/auth/pin.js';
 import { publish } from '../services/events/bus.js';
 import { appendEntry } from '../services/blockchain/ledger.js';
@@ -85,7 +85,8 @@ router.post('/', authenticate, async (req, res) => {
     );
   }
 
-  if (sender.phone_number === recipientPhone) {
+  const isSelfRecipient = sender.phone_number === recipientPhone;
+  if (isSelfRecipient && !SELF_SERVICE_CATEGORIES.has(category)) {
     return res.status(400).json({ error: 'Cannot send to yourself' });
   }
   if (Number(sender.balance) < amount) {
@@ -114,10 +115,15 @@ router.post('/', authenticate, async (req, res) => {
         'UPDATE users SET balance = balance - $1 WHERE id = $2',
         [amount, sender.id]
       );
-      await client.query(
-        'UPDATE users SET balance = balance + $1 WHERE phone_number = $2',
-        [amount, recipientPhone]
-      );
+      // Self-service purchases (airtime/bill for your own number) spend the
+      // amount rather than moving it — crediting it back to the same
+      // account would net the debit above to zero.
+      if (!isSelfRecipient) {
+        await client.query(
+          'UPDATE users SET balance = balance + $1 WHERE phone_number = $2',
+          [amount, recipientPhone]
+        );
+      }
     }
 
     // ── Dynamic trust score update ─────────────────────────────────────────
