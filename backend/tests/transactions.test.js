@@ -96,6 +96,30 @@ describe('POST /api/transactions', () => {
     expect(res.body.error).toMatch(/yourself/i);
   });
 
+  it('allows AIRTIME to yourself and debits balance without crediting it back', async () => {
+    const { rows: before } = await pool.query('SELECT balance FROM users WHERE id = $1', [senderId]);
+    const balanceBefore = Number(before[0].balance);
+
+    const res = await request(app)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .send({ recipientPhone: SENDER_PHONE, amount: 20, category: 'AIRTIME' });
+
+    expect(res.status).toBe(201);
+
+    const { rows: after } = await pool.query('SELECT balance FROM users WHERE id = $1', [senderId]);
+    expect(Number(after[0].balance)).toBe(balanceBefore - 20);
+  });
+
+  it('still returns 400 when sending P2P to yourself', async () => {
+    const res = await request(app)
+      .post('/api/transactions')
+      .set('Authorization', `Bearer ${senderToken}`)
+      .send({ recipientPhone: SENDER_PHONE, amount: 50, category: 'AGENT' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/yourself/i);
+  });
+
   it('returns 400 for insufficient balance', async () => {
     // 10,000 > sender balance of 5,000 but within Zod max(50,000)
     const res = await request(app)
