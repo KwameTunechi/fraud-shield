@@ -7,6 +7,19 @@ import { pool } from '../../db/pool.js';
 
 const THRESHOLDS = { safe: 30, review: 70 }; // 0-29 safe | 30-69 review | 70+ blocked
 
+// Self-service categories (airtime top-ups, bill payments) go to a fixed,
+// known destination — the customer's own number or a biller short code —
+// chosen from a picker, not typed in. A "new recipient" there is normal
+// and not a fraud signal the way a first-time P2P transfer is.
+const SELF_SERVICE_CATEGORIES = new Set(['AIRTIME', 'BILL']);
+
+// Large-amount threshold, GHS. Airtime top-ups are typically ₵2–100; a
+// ₵2,000 top-up is far more anomalous than a ₵2,000 P2P transfer, so it
+// needs its own, much lower bar. Bills (electricity, DStv, etc.) can
+// legitimately run into the thousands, so they keep the general threshold.
+const AMOUNT_THRESHOLDS = { AIRTIME: 500 };
+const DEFAULT_AMOUNT_THRESHOLD = 2000;
+
 const RULES = [
   // Rule 1 — Late night (22:00–05:00 UTC, which equals Accra/Ghana time, UTC+0)
   ({ createdAt }) => {
@@ -15,14 +28,23 @@ const RULES = [
     return null;
   },
 
-  // Rule 2 — Large single amount (above ₵2,000)
-  ({ amount }) => {
-    if (Number(amount) > 2000) return { points: 20, reason: 'amount_above_2000_ghs' };
+  // Rule 2 — Large single amount (category-specific threshold — see AMOUNT_THRESHOLDS)
+  ({ amount, category }) => {
+    if (category in AMOUNT_THRESHOLDS) {
+      if (Number(amount) > AMOUNT_THRESHOLDS[category]) {
+        return { points: 20, reason: 'amount_above_threshold_airtime' };
+      }
+      return null;
+    }
+    if (Number(amount) > DEFAULT_AMOUNT_THRESHOLD) {
+      return { points: 20, reason: 'amount_above_2000_ghs' };
+    }
     return null;
   },
 
-  // Rule 3 — Recipient the sender has never paid before
-  async ({ senderId, recipientPhone }) => {
+  // Rule 3 — Recipient the sender has never paid before (skipped for self-service categories)
+  async ({ senderId, recipientPhone, category }) => {
+    if (SELF_SERVICE_CATEGORIES.has(category)) return null;
     const { rows } = await pool.query(
       `SELECT 1 FROM transactions
        WHERE sender_id = $1 AND recipient_phone = $2 AND status != 'blocked'

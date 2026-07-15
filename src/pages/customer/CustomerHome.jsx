@@ -139,7 +139,7 @@ function AirtimeModal({ customer, onClose, onSuccess }) {
         recipientPhone: normalizePhone(phone),
         amount: amtNum,
         pin,
-        category: 'MERCHANT',
+        category: 'AIRTIME',
       })
       setRef(res.transaction?.reference ?? '')
       setStep('done')
@@ -248,7 +248,7 @@ function PayBillModal({ customer, onClose, onSuccess }) {
         recipientPhone: biller.phone,
         amount: amtNum,
         pin,
-        category: 'MERCHANT',
+        category: 'BILL',
       })
       setRef(res.transaction?.reference ?? '')
       setStep('done')

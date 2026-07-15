@@ -26,7 +26,7 @@ function riskLabel(score) { return score < 30 ? 'Low' : score < 70 ? 'Medium' : 
 function riskHex(score)   { return score < 30 ? '#22c55e' : score < 70 ? '#f59e0b' : '#ef4444' }
 function statusHex(s)     { return s === 'completed' ? '#16a34a' : s === 'review' ? '#d97706' : '#dc2626' }
 function statusLabel(s)   { return s === 'completed' ? 'Safe' : s === 'review' ? 'Review' : 'Blocked' }
-function txEmoji(cat)     { return cat === 'MERCHANT' ? '🛍️' : cat === 'AGENT' ? '🏦' : '💸' }
+function txEmoji(cat)     { return cat === 'MERCHANT' ? '🛍️' : cat === 'AGENT' ? '🏦' : cat === 'AIRTIME' ? '📱' : cat === 'BILL' ? '🧾' : '💸' }
 
 const SEVERITY_STYLE = {
   critical: { bg: '#fef2f2', border: '#fecaca', iconBg: '#ef4444', titleColor: '#dc2626', Icon: AlertTriangle },

@@ -67,14 +67,15 @@ export default function AirtimeScreen({ navigation }) {
     }
     setLoading(true);
     try {
-      // Airtime is implemented as a P2P transaction to the same number
-      // with category MERCHANT and a metadata flag. This keeps the
-      // blockchain and risk scorer in the loop.
+      // Airtime is implemented as a transaction to the recipient number
+      // with category AIRTIME, which keeps the blockchain and risk scorer
+      // in the loop but scores it against airtime-appropriate thresholds
+      // (see backend/src/services/risk/scorer.js) instead of P2P ones.
       const res = await api.post('/api/transactions', {
         recipientPhone: normalizePhone(phone),
         amount: amountNum,
         pin,
-        category: 'MERCHANT',
+        category: 'AIRTIME',
       });
       setResult(res.transaction);
       setStep('done');

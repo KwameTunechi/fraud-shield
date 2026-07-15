@@ -13,6 +13,13 @@ export const REASON_EXPLANATIONS = {
     severity: 'medium',
     icon: '💰',
   },
+  amount_above_threshold_airtime: {
+    title: 'Unusually Large Airtime/Bill Top-up',
+    detail: 'The amount exceeds ₵500, well above a typical airtime or bill top-up. Airtime purchases are a known fraud pattern — attackers with a compromised account often buy large top-ups to convert stolen balance into resellable value.',
+    points: 20,
+    severity: 'medium',
+    icon: '📱',
+  },
   new_recipient: {
     title: 'First-Time Recipient',
     detail: "The sender has never previously sent money to this phone number. First-time transfers to unknown recipients carry elevated risk because fraudsters typically direct stolen funds to new, unlinked accounts.",

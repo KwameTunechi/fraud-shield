@@ -20,7 +20,7 @@ const createSchema = z.object({
   recipientPhone: z.string().regex(/^\+233\d{9}$/),
   amount:         z.number().positive().max(50000),
   pin:            z.string().regex(/^\d{4}$/),
-  category:       z.enum(['P2P', 'AGENT', 'MERCHANT']).default('P2P'),
+  category:       z.enum(['P2P', 'AGENT', 'MERCHANT', 'AIRTIME', 'BILL']).default('P2P'),
 });
 
 // ─── POST /api/transactions — submit a transaction (customers only) ───────────
@@ -97,6 +97,7 @@ router.post('/', authenticate, async (req, res) => {
     senderId: sender.id,
     recipientPhone,
     amount,
+    category,
     createdAt: new Date().toISOString(),
   });
 
@@ -341,7 +342,7 @@ router.post('/preview', authenticate, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
   }
-  const { recipientPhone, amount } = parsed.data;
+  const { recipientPhone, amount, category } = parsed.data;
 
   const { rows: senderRows } = await pool.query(
     'SELECT * FROM users WHERE id = $1', [req.principal.sub]
@@ -353,6 +354,7 @@ router.post('/preview', authenticate, async (req, res) => {
     senderId: sender.id,
     recipientPhone,
     amount,
+    category,
     createdAt: new Date().toISOString(),
   });
 

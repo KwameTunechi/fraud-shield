@@ -60,7 +60,7 @@ export default function PayBillScreen({ navigation }) {
         recipientPhone: biller.recipientPhone,
         amount: amountNum,
         pin,
-        category: 'MERCHANT',
+        category: 'BILL',
       });
       setResult(res.transaction);
       setStep('done');
