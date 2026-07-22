@@ -94,7 +94,6 @@ export default function CustomerOTP() {
             <div style={{ fontSize: '13px', color: C.textSub, lineHeight: '1.6' }}>
               We sent a 6-digit code to<br /><strong style={{ color: C.text }}>{phone}</strong>
             </div>
-            <div style={{ fontSize: '12px', color: C.textMuted }}>Dev code: <strong>123456</strong></div>
           </div>
 
           <form onSubmit={handleVerify} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
