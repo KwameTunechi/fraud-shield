@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
-  ArrowLeft, AlertTriangle, CheckCircle, Clock, User, CreditCard,
+  ArrowLeft, ArrowRight, AlertTriangle, CheckCircle, Clock, User, CreditCard,
   ShieldAlert, ShieldCheck, History, AlertCircle, X, Brain,
 } from 'lucide-react'
 import DashboardLayout from '../components/DashboardLayout'
@@ -278,12 +278,29 @@ export default function IncidentDetail() {
             </div>
             {txLoading ? <Loading /> : tx ? (
               <>
+                {/* Parties involved — sender & recipient, so support can reach
+                    either party directly when investigating a flagged issue */}
+                <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px', marginBottom: '16px' }}>
+                  <div style={{ flex: 1, minWidth: 0, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Sender</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '2px', wordBreak: 'break-word' }}>{tx.sender_name || '—'}</div>
+                    <div style={{ fontSize: '12px', color: '#64748b', wordBreak: 'break-all' }}>{tx.sender_phone || '—'}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', color: '#cbd5e1', flexShrink: 0 }}>
+                    <ArrowRight size={18} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px' }}>
+                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '6px' }}>Recipient</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '2px', wordBreak: 'break-word' }}>{tx.recipient_name || 'Unregistered recipient'}</div>
+                    <div style={{ fontSize: '12px', color: '#64748b', wordBreak: 'break-all' }}>{tx.recipient_phone || '—'}</div>
+                  </div>
+                </div>
+
                 <div className="rg-2" style={{ gap: '12px', marginBottom: '14px' }}>
                   {[
                     { label: 'Amount',     value: fmtMoney(tx.amount) },
                     { label: 'Risk Score', value: tx.risk_score != null ? `${tx.risk_score}/100` : '—' },
                     { label: 'Reference',  value: tx.reference },
-                    { label: 'Recipient',  value: tx.recipient_phone },
                     { label: 'Category',   value: tx.category },
                     { label: 'Date',       value: fmtDate(tx.created_at) },
                   ].map(({ label, value }) => (
